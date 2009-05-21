@@ -1,0 +1,144 @@
+;-------------------------------------------------------------------------------
+function lineresid, p, x = x, y = y, e_x = e_x, e_y = e_y, e_int = e_int
+    ;---------------------------------------------------------------------------
+    ; PURPOSE
+    ; Utility function called by mpfitexy. Given a set of data, returns the
+    ; residuals weighted by both error bars and optional intrinsic scatter 
+    ; when fitted with a straight line
+    ;---------------------------------------------------------------------------
+    ; INPUTS
+    ;           x, y: independent and dependent variables
+    ;       e_x, e_y: corresponding error bars
+    ;          e_int: intrinsic scatter
+    ;              p: [slope, intercept]
+    ;---------------------------------------------------------------------------
+    ; OUTPUT
+    ; Residual of data from models with these data and choice of paramters
+    ;---------------------------------------------------------------------------
+    slope = p[0]
+    intercept = p[1]
+    f = slope * x + intercept
+    if n_elements(e_int) eq 0 then e_int = 0.0
+    resid = (y - f)/(e_y^2 + slope^2*e_x^2 + e_int^2)
+    return, resid
+end
+;-------------------------------------------------------------------------------
+function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
+    guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
+    fixint = fixint
+    ;---------------------------------------------------------------------------
+    ; PURPOSE
+    ; Uses MPFIT to determine straight line fit to data with errors in both
+    ; variables using the weighting defined in Numerical Recipes, i.e. emulates
+    ; the ASTROIDL library function FITEXY.
+    ;---------------------------------------------------------------------------
+    ; INPUTS
+    ;           x, y: independent and dependent variables
+    ;       e_x, e_y: corresponding error bars
+    ;          guess: starting points for slope, intercept Slope can be fixed 
+    ;                 (see below). Default = [0.0, 0.0, 0.0]
+    ;      /fixslope: fix the slope to guess[0] 
+    ;         /quiet: Suppress MPFIT's text output
+    ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
+    ;                 sqrt(minchi2/dof) ~= 1.0
+    ;        /fixint: fix the intercept to guess[0]
+    ;---------------------------------------------------------------------------
+    ; OUTPUTS
+    ;         errors: 1 sigma fitting errors in paramters slope and intercept.
+    ;                 Dubious if sqrt(minchi2/dof) != 1.0
+    ;        minchi2: chi-squared of final model
+    ;            dof: degrees of freedom
+    ;         return: best parameters of model: slope, intercept
+    ;---------------------------------------------------------------------------
+
+    ;---------------------------------------------------------------------------
+    ; DEFAULTS
+    ;---------------------------------------------------------------------------
+    if n_elements(e_int) eq 0 then e_int = 0.0
+    if n_elements(guess) eq 0 then guess = [0., 0.] else guess = float(guess)
+
+    ;---------------------------------------------------------------------------
+    ; FIX SLOPE/LABEL PARAMETERS
+    ;---------------------------------------------------------------------------
+    pi = replicate({fixed:0, limited:[0,0], limits:[0.D,0.D], parname:''},2)
+    if keyword_set(fixslope) then pi(0).fixed = 1
+    if keyword_set(fixint) then pi(1).fixed = 1
+    pi(0).parname = '    Slope'
+    pi(1).parname = 'Intercept'
+
+    ;---------------------------------------------------------------------------
+    ; CALL MPFIT
+    ;---------------------------------------------------------------------------
+    result = mpfit('lineresid', guess, functargs = {x:x, y:y, e_x:e_x, e_y:e_y, $
+        e_int:e_int}, status = status, errmsg = errmsg, perror = perror, $
+        bestnorm = minchi2, parinfo = pi, dof = dof, quiet = quiet)
+    return, result
+end
+
+;-------------------------------------------------------------------------------
+pro testmpfitexy
+    ;---------------------------------------------------------------------------
+    ; PURPOSE
+    ; Code to test mpfitexy2 and mpfitxy
+    ; Result should be a plot of two lines which overlap. Blue line is fit from
+    ; mpfitexy, dashed red line from fitexy. Outputs fit parameters, errors 
+    ; in these and sqrt(chi-squared/DOF) for both methods, which should all 
+    ; match
+    ;---------------------------------------------------------------------------
+    
+    ;---------------------------------------------------------------------------
+    ; SETUP
+    ;---------------------------------------------------------------------------
+    x = [2.43184, 2.34696, 2.21818, 2.23748, 2.16919, 2.12780, 2.15438, $
+        2.24805, 2.29982, 2.14897, 2.17739, 2.22395, 2.12592, 2.44776, $
+        2.19388, 2.37343, 2.39492, 2.23249, 2.17179, 2.40253, 2.38844, $
+        2.37377, 2.22880, 2.21212, 2.26511, 2.32707, 2.33750, 2.15525]
+    y = [-25.3406, -24.8878, -22.6971, -22.8706, -22.7128, -22.4252, -22.9278, $
+        -23.8840, -24.7333, -23.0504, -23.5204, -24.0678, -23.0894, -25.5364, $
+        -23.5926, -25.3422, -25.0512, -24.2071, -24.1777, -25.1833, -24.8495, $
+        -24.5180, -24.4620, -23.2211, -25.2567, -24.8611, -25.2406, -23.2333]
+    e_x = [0.00571056, 0.0249614, 0.00348239, 0.0192876, 0.0228633, $
+        0.00863316, 0.0357660, 0.00380802, 0.00545385, 0.00564655, $
+        0.00300506, 0.0340787, 0.0335453, 0.00403909, 0.0522591, $
+        0.0109578, 0.00863588, 0.0209927, 0.0510806, 0.0656906, 0.0100137, $
+        0.00491871, 0.0204541, 0.00346392, 0.0107160, 0.00327621, $
+        0.00947749, 0.0233549]
+    e_y = [0.0434049, 0.0429708, 0.208040, 0.159271, 0.0503973, 0.103848, $
+        0.0504721, 0.0643180, 0.0422348, 0.0273715, 0.0239415, 0.0999366, $
+        0.0457358, 0.0461065, 0.0563985, 0.0450141, 0.0479903, 0.0541895, $
+        0.0601011, 0.0521960, 0.0512739, 0.0498970, 0.0448522, 0.0457561, $
+        0.0708393, 0.0523630, 0.0460620, 0.0519679]
+
+    ;---------------------------------------------------------------------------
+    ; FITTING
+    ;---------------------------------------------------------------------------
+    ; Fit relationship y = a * (x + offset) + b
+    offset = -2.5
+    ;---------------------------------------------------------------------------
+    ; Intrinsic scatter for chi-squared ~= 1.0
+    e_int = 0.45
+    a = mpfitexy(x + offset, y, e_x, e_y, errors = mpfiterrors, /quiet, $
+        e_int = 0.45, minchi2 = minchi2, dof = dof) 
+    fitexy, x + offset, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
+        fitexyerrors, minchi2exy, qexy
+    print, a, mpfiterrors, sqrt(minchi2/dof)
+    ; Reverse because fitexy returns parameters backwards
+    print, [d, c], reverse(fitexyerrors), sqrt(minchi2exy/dof)
+
+    ;---------------------------------------------------------------------------
+    ; PLOTTING
+    ;---------------------------------------------------------------------------
+    ; Plot data
+    ;---------------------------------------------------------------------------
+    ploterror, x, y, e_x, e_y, psym = 1
+    ;---------------------------------------------------------------------------
+    ; Plot fit from mpfitexy (thick blue line)
+    ;---------------------------------------------------------------------------
+    oplot, !x.crange, a[0]*(!x.crange + offset) + a[1], $
+        color = fsc_color("Blue"), thick = 4
+    ;---------------------------------------------------------------------------
+    ; Plot fit from fitexy (dashed red line)
+    ;---------------------------------------------------------------------------
+    oplot, !x.crange, c + d*(!x.crange + offset), color = fsc_color("Red"), $
+        linestyle = 2, thick = 2
+end
