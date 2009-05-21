@@ -33,7 +33,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int = e_int, chi2red = chi2red, x0 = x0, noreduce = noreduce
+    quiet = quiet, e_int = e_int, chi2red = chi2red, x0 = x0, reduce = reduce
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine a common slope and two intercepts for two sets of
@@ -61,10 +61,10 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int) eq 0 then e_int = 0.1
+    if n_elements(e_int) eq 0 then e_int = 0.0
     if n_elements(guess) ne 3 then guess = [1.0, 1.0, 1.0] else guess = float(guess)
     if n_elements(x0) eq 0 then x0 = 0
-    if ~keyword_set(noreduce) then reduce = 1
+    if keyword_set(reduce) then e_int = 0.1
 
     ;---------------------------------------------------------------------------
     ; RESCALE X-COORDS TO X0
