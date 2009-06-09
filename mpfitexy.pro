@@ -19,7 +19,7 @@ function lineresid, p, x = x, y = y, e_x = e_x, e_y = e_y, e_int = e_int
     intercept = p[1]
     f = slope * x + intercept
     if n_elements(e_int) eq 0 then e_int = 0.0
-    resid = (y - f)/(e_y^2 + slope^2*e_x^2 + e_int^2)
+    resid = (y - f)/sqrt((e_y^2 + slope^2*e_x^2 + e_int^2))
     return, resid
 end
 ;-------------------------------------------------------------------------------
