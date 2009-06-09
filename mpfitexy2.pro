@@ -33,7 +33,8 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int = e_int, chi2red = chi2red, x0 = x0, reduce = reduce
+    quiet = quiet, e_int = e_int, chi2red = chi2red, x0 = x0, reduce = reduce, $
+    latex = latex
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine a common slope and two intercepts for two sets of
@@ -47,6 +48,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;                 can be fixed (see below). Default = [0.0, 0.0, 0.0]
     ;      /fixslope: fix the slope to guess[0] 
     ;         /quiet: Suppress MPFIT's text output
+    ;         /latex: LaTeX output of fit params
     ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
     ;                 sqrt(minchi2/dof) ~= 1.0
     ;---------------------------------------------------------------------------
@@ -124,7 +126,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     denominator = total(w1) + total(w2)
     scatter = sqrt(numerator/denominator)
 
-    if ~keyword_set(silent) then begin
+    if keyword_set(latex) then begin
         sep = "&"
         math = "$"
         pm = "\pm"
@@ -135,7 +137,8 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
             chi2red, sep, $
             e_int, sep, $
             scatter, newline, $
-            format = '(A1,F5.2,A3,F5.2,A1,A2,A2,F8.2,A3,F5.2,A1,A2,A2,F5.2,A3,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
+            format = '(A1,F5.2,A3,F5.2,A1,A2,A2,F8.2,A3,F5.2,A1,A2,A2,F5.2,' + $
+             'A3,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
     endif
     return, result
 end
@@ -171,8 +174,6 @@ pro testmpfitexy2, ps = ps
         0.0601011, 0.0521960, 0.0512739, 0.0498970, 0.0448522, 0.0457561, $
         0.0708393, 0.0523630, 0.0460620, 0.0519679]
 
-    stop
-
     sample1 = where(y ge -8.3 * x - 5.4)
     sample2 = where(y lt -8.3 * x - 5.4)
 
@@ -195,25 +196,29 @@ pro testmpfitexy2, ps = ps
     e_int = 0.25
     ;---------------------------------------------------------------------------
     ; Fit the whole sample at once, totally free, using FITEXY
-    fitexy, x, y, a, b, x_sig = e_x, y_sig = e_y
+    fitexy, x, y, a, b, x_sig = e_x, y_sig = e_y, fitexyerrors, minchi2exy
     print, "# FIT ALL (FITEXY, no intrinsic error)"
-    print, a, b
+    print, "Fit = ", b, a
+    print, "Errors = ", reverse(fitexyerrors)
+    print, "Reduced chi2 = ", sqrt(minchi2exy/(n_elements(x1) + n_elements(x2) - 2))
     ;---------------------------------------------------------------------------
     ; Fit the whole sample at once, totally free, using MPFITEXY
-    fitall = mpfitexy(x, y, e_x, e_y, e_int = e_int, errors = errorsall, $
+    fitall = mpfitexy(x, y, e_x, e_y, e_int = 0., errors = errorsall, $
         /quiet, dof = dofall, minchi2 = minchi2all)
-    print, "# FIT ALL (MPFITEXY)"
+    print, "# FIT ALL (MPFITEXY, no intrinsic error)"
     print, "Fit = ", fitall
     print, "Errors = ", errorsall
     print, "Reduced chi2 = ", sqrt(minchi2all/dofall)
     ;---------------------------------------------------------------------------
     ; Fit the two samples individually using mpfitexy2
     fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
-        dof = dof, minchi2 = minchi2, /quiet, e_int = e_int, x0 = x0)
+        dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
+        /quiet, /latex)
     print, "MPFITEXY2"
     print, "Fit = ", fit
     print, "Errors = ", errors
-    print, "Reduced chi2 = ", sqrt(minchi2/dof)
+    print, "Reduced chi2 = ", sqrt(minchi2/dof), $
+        ", e_int for this reduced chi2 = ", e_int_reduced
     ;---------------------------------------------------------------------------
     ; Fit the two samples seperately, constrain the slope to be that found with
     ; mpfitexy2
@@ -221,7 +226,7 @@ pro testmpfitexy2, ps = ps
         errors = errors1, dof = dof1, minchi2 = minchi21, e_int = e_int, /quiet)
     fit2 = mpfitexy(x2, y2, e_x2, e_y2, guess = [fit[0], 0.], /fixslope, $
         errors = errors2, dof = dof2, minchi2 = minchi22, e_int = e_int, /quiet)
-    print, "MPFITEXY"
+    print, "MPFITEXY of two samples with fixed slope " + strtrim(fit[0], 2)
     print, "Fits = ", fit1, fit2
     print, "Errors = ", errors1, errors2
     print, "Reduced chi2s = ", sqrt(minchi21/dof1), sqrt(minchi22/dof2)
