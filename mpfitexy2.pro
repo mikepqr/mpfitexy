@@ -33,7 +33,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int = e_int, chi2red = chi2red, x0 = x0, reduce = reduce, $
+    quiet = quiet, e_int = e_int, chired = chired, x0 = x0, reduce = reduce, $
     latex = latex
     ;---------------------------------------------------------------------------
     ; PURPOSE
@@ -97,21 +97,21 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         e_x2:e_x2[ok2], e_y2:e_y2[ok2], e_int:e_int}, parinfo = pi, $
         status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
         perror = perror, quiet = quiet)
-    chi2red = sqrt(minchi2/dof)
-    if ~keyword_set(quiet) then print, chi2red, e_int
+    chired = sqrt(minchi2/dof)
+    if ~keyword_set(quiet) then print, chired, e_int
     ;---------------------------------------------------------------------------
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
     ;---------------------------------------------------------------------------
     if keyword_set(reduce) then begin
-        while abs(chi2red - 1.) gt 0.01 do begin
-            e_int = e_int * chi2red^(4./3)
+        while abs(chired - 1.) gt 0.01 do begin
+            e_int = e_int * chired^(4./3)
             result = mpfit('parallellineresid', guess, functargs = {x1:x1_[ok1], $
                 y1:y1[ok1], x2:x2_[ok2], y2:y2[ok2], e_x1:e_x1[ok1], e_y1:e_y1[ok1], $
                 e_x2:e_x2[ok2], e_y2:e_y2[ok2], e_int:e_int}, parinfo = pi, $
                 status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
                 perror = perror, quiet = quiet)
-            chi2red = sqrt(minchi2/dof)
-            if ~keyword_set(quiet) then print, chi2red, e_int
+            chired = sqrt(minchi2/dof)
+            if ~keyword_set(quiet) then print, chired, e_int
         endwhile
     endif
 
@@ -134,7 +134,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         print, math, result[0], pm, perror[0], math, sep, $
             math, result[1], pm, perror[1], math, sep, $
             math, result[2], pm, perror[2], math, sep, $
-            chi2red, sep, $
+            chired, sep, $
             e_int, sep, $
             scatter, newline, $
             format = '(A1,F5.2,A3,F5.2,A1,A2,A2,F8.2,A3,F5.2,A1,A2,A2,F5.2,' + $
