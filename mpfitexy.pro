@@ -25,7 +25,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
-    fixint = fixint
+    fixint = fixint, x0 = x0
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine straight line fit to data with errors in both
@@ -35,6 +35,7 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ; INPUTS
     ;           x, y: independent and dependent variables
     ;       e_x, e_y: corresponding error bars
+    ;             x0: fit the relationship y = a(x - x0) + b
     ;          guess: starting points for slope, intercept Slope can be fixed 
     ;                 (see below). Default = [0.0, 0.0, 0.0]
     ;      /fixslope: fix the slope to guess[0] 
@@ -56,6 +57,13 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;---------------------------------------------------------------------------
     if n_elements(e_int) eq 0 then e_int = 0.0
     if n_elements(guess) eq 0 then guess = [0., 0.] else guess = float(guess)
+    if n_elements(x0) eq 0 then x0 = 0
+    if keyword_set(reduce) then e_int = 0.1
+
+    ;---------------------------------------------------------------------------
+    ; RESCALE X-COORDS TO X0
+    ;---------------------------------------------------------------------------
+    x_ = x - x0
 
     ;---------------------------------------------------------------------------
     ; FIX SLOPE/LABEL PARAMETERS
@@ -67,11 +75,17 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     pi(1).parname = 'Intercept'
 
     ;---------------------------------------------------------------------------
+    ; CHECK ALL VALUES FINITE
+    ;---------------------------------------------------------------------------
+    ok = where(finite(x_) and finite(y))
+
+    ;---------------------------------------------------------------------------
     ; CALL MPFIT
     ;---------------------------------------------------------------------------
-    result = mpfit('lineresid', guess, functargs = {x:x, y:y, e_x:e_x, e_y:e_y, $
-        e_int:e_int}, status = status, errmsg = errmsg, perror = perror, $
-        bestnorm = minchi2, parinfo = pi, dof = dof, quiet = quiet)
+    result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y[ok], $
+        e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, status = status, $
+        errmsg = errmsg, perror = perror, bestnorm = minchi2, parinfo = pi, $
+        dof = dof, quiet = quiet)
     return, result
 end
 
@@ -112,14 +126,15 @@ pro testmpfitexy
     ;---------------------------------------------------------------------------
     ; FITTING
     ;---------------------------------------------------------------------------
-    ; Fit relationship y = a * (x + offset) + b
-    offset = -2.5
+    ; Fit relationship y = a * (x - x0) + b
+    x0 = 2.5
+
     ;---------------------------------------------------------------------------
     ; Intrinsic scatter for chi-squared ~= 1.0
     e_int = 0.45
-    a = mpfitexy(x + offset, y, e_x, e_y, errors = mpfiterrors, /quiet, $
+    a = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors, /quiet, $
         e_int = 0.45, minchi2 = minchi2, dof = dof) 
-    fitexy, x + offset, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
+    fitexy, x - x0, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
         fitexyerrors, minchi2exy, qexy
     print, a, mpfiterrors, sqrt(minchi2/dof)
     ; Reverse because fitexy returns parameters backwards
@@ -134,11 +149,11 @@ pro testmpfitexy
     ;---------------------------------------------------------------------------
     ; Plot fit from mpfitexy (thick blue line)
     ;---------------------------------------------------------------------------
-    oplot, !x.crange, a[0]*(!x.crange + offset) + a[1], $
+    oplot, !x.crange, a[0]*(!x.crange - x0) + a[1], $
         color = fsc_color("Blue"), thick = 4
     ;---------------------------------------------------------------------------
     ; Plot fit from fitexy (dashed red line)
     ;---------------------------------------------------------------------------
-    oplot, !x.crange, c + d*(!x.crange + offset), color = fsc_color("Red"), $
+    oplot, !x.crange, c + d*(!x.crange - x0), color = fsc_color("Red"), $
         linestyle = 2, thick = 2
 end
