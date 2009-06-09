@@ -25,7 +25,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
-    fixint = fixint, x0 = x0
+    fixint = fixint, x0 = x0, reduce = reduce
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine straight line fit to data with errors in both
@@ -43,6 +43,7 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
     ;                 sqrt(minchi2/dof) ~= 1.0
     ;        /fixint: fix the intercept to guess[0]
+    ;        /reduce: adjust intrinsic scatter e_int to ensure chired ~= 1.0
     ;---------------------------------------------------------------------------
     ; OUTPUTS
     ;         errors: 1 sigma fitting errors in paramters slope and intercept.
@@ -58,7 +59,7 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     if n_elements(e_int) eq 0 then e_int = 0.0
     if n_elements(guess) eq 0 then guess = [0., 0.] else guess = float(guess)
     if n_elements(x0) eq 0 then x0 = 0
-    if keyword_set(reduce) then e_int = 0.1
+    if keyword_set(reduce) then e_int = mean(e_x)
 
     ;---------------------------------------------------------------------------
     ; RESCALE X-COORDS TO X0
@@ -80,12 +81,30 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ok = where(finite(x_) and finite(y))
 
     ;---------------------------------------------------------------------------
-    ; CALL MPFIT
+    ; CALL MPFIT ONCE
     ;---------------------------------------------------------------------------
     result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y[ok], $
-        e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, status = status, $
-        errmsg = errmsg, perror = perror, bestnorm = minchi2, parinfo = pi, $
-        dof = dof, quiet = quiet)
+        e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, parinfo = pi, $
+        status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
+        perror = perror, quiet = quiet)
+    chired = sqrt(minchi2/dof)
+    if ~keyword_set(quiet) then print, chired, e_int
+    ;---------------------------------------------------------------------------
+    ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
+    ;---------------------------------------------------------------------------
+    if keyword_set(reduce) then begin
+        while abs(chired - 1.) gt 0.01 do begin
+            e_int = e_int * chired^(4./3)
+            result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y[ok], $
+                e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, parinfo = pi, $
+                status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
+                perror = perror, quiet = quiet)
+            chired = sqrt(minchi2/dof)
+            if ~keyword_set(quiet) then print, chired, e_int
+            stop
+        endwhile
+    endif
+
     return, result
 end
 
@@ -130,13 +149,18 @@ pro testmpfitexy
     x0 = 2.5
 
     ;---------------------------------------------------------------------------
+    ; Fit using MPFITEXY
+    a = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors, $
+        minchi2 = minchi2, dof = dof, e_int = e_int, guess = [-9., -26.], /reduce)
+    print, "Fit = ", a
+    print, "Errors = ", mpfiterrors
+    print, "Reduced chi = ", sqrt(minchi2/dof), " for scatter ", e_int
+
+    ;---------------------------------------------------------------------------
     ; Intrinsic scatter for chi-squared ~= 1.0
     e_int = 0.45
-    a = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors, /quiet, $
-        e_int = 0.45, minchi2 = minchi2, dof = dof) 
     fitexy, x - x0, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
         fitexyerrors, minchi2exy, qexy
-    print, a, mpfiterrors, sqrt(minchi2/dof)
     ; Reverse because fitexy returns parameters backwards
     print, [d, c], reverse(fitexyerrors), sqrt(minchi2exy/dof)
 
