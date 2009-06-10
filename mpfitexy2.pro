@@ -26,8 +26,9 @@ function parallellineresid, p, x1 = x1, y1 = y1, x2 = x2, y2 = y2, $
 
     if n_elements(e_int) eq 0 then e_int = 0.0
     
-    resid1 = sqrt((y1 - f1)^2/(e_y1^2 + slope^2 * e_x1^2 + e_int^2))
-    resid2 = sqrt((y2 - f2)^2/(e_y2^2 + slope^2 * e_x2^2 + e_int^2))
+    resid1 = (y1 - f1)/sqrt((e_y1^2 + slope^2 * e_x1^2 + e_int^2))
+    resid2 = (y2 - f2)/sqrt((e_y2^2 + slope^2 * e_x2^2 + e_int^2))
+
     return, [resid1, resid2]
 end
 ;-------------------------------------------------------------------------------
@@ -265,4 +266,78 @@ pro testmpfitexy2, ps = ps
     oplot, xrange, fit1[0] * xrange + fit1[1], linestyle = 2
     oplot, xrange, fit2[0] * xrange + fit2[1], linestyle = 2
     if keyword_set(ps) then closepsdev
+end
+
+;-------------------------------------------------------------------------------
+pro testmpfitexy2order, ps = ps, shufs0 = shufs0, shufsp = shufsp, old = old, $
+    rev = rev, srt = srt
+    ;---------------------------------------------------------------------------
+    ; PURPOSE
+    ; Code to test whether shuffling arrays makes a difference
+    ;---------------------------------------------------------------------------
+    
+    ;---------------------------------------------------------------------------
+    ; SETUP
+    ;---------------------------------------------------------------------------
+    ; Set up two samples of data.
+    s0 = ['NGC_0128', 'ESO_151G04', 'NGC_1381', 'NGC_1596', 'NGC_2310', $
+        'ESO_311G12', 'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', $
+        'ESO_597G36', 'NGC_1032', 'NGC_3957', 'NGC_5084']
+    sp = ['NGC_3390', 'PGC_44931', 'ESO_443G42', 'NGC_5746', 'IC_4767', $
+        'NGC_6722', 'ESO_185G53', 'IC_4937', 'IC_5096', 'ESO_240G11', $
+        'NGC_1886', 'NGC_4703', 'NGC_7123', 'IC_5176']
+
+    if keyword_set(rev) then begin
+        s0 = reverse(s0)
+        sp = reverse(sp)
+    endif
+
+    if keyword_set(srt) then begin
+        i = sort(s0)
+        s0 = s0[i]
+        j = sort(sp)
+        sp = sp[j]
+    endif
+
+    if keyword_set(old) then begin
+        ; Old galaxy order (FIX: this gives different answers for log mass fits,
+        ; and possibly others. This may be a bug in mpfitexy)
+        s0 = ['NGC_0128', 'NGC_1381', 'NGC_1596', 'NGC_2310', 'ESO_311G12', $
+                'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', 'ESO_597G36', $
+                'NGC_1032', 'NGC_3957', 'NGC_5084', 'ESO_151G04']
+        sp = ['NGC_3390', 'ESO_240G11', 'ESO_443G42', 'IC_4767', 'IC_4937', $
+                'IC_5096', 'IC_5176', 'NGC_1886', 'ESO_185G53', 'NGC_4703', $
+                'NGC_5746', 'NGC_6722', 'NGC_7123', 'PGC_44931']
+    endif
+
+    if keyword_set(shufs0) then begin
+        i = randperm(n_elements(s0))
+        s0 = s0[i]
+    endif
+    if keyword_set(shufsp) then begin
+        j = randperm(n_elements(sp))
+        sp = sp[j]
+    endif
+
+
+    ; Fix distance and apparent magnitude errors
+    fixderror = 0.0
+    fixapperror = 0.0
+    logmasssp = logmass(sp, error = e_logmasssp, fixapperror = fixapperror, $
+        fixderror = fixderror)
+    logmasss0 = logmass(s0, error = e_logmasss0, fixapperror = fixapperror, $
+        fixderror = fixderror)
+    ; Evaluate model circular velocity and error
+    vcsp = modelmeanvc(sp, error = e_vcsp)
+    logvcsp = alog10(vcsp)
+    e_logvcsp = e_vcsp/(vcsp * alog(10))
+    vcs0 = modelmeanvc(s0, error = e_vcs0)
+    logvcs0 = alog10(vcs0)
+    e_logvcs0 = e_vcs0/(vcs0 * alog(10))
+
+    x0 = 2.4
+    vmassguess = [3.0, 11.0, 0.2] * 1.d
+    logvc_logmass = mpfitexy2(logvcsp * 1.d, logmasssp * 1.d, logvcs0 * 1.d, $
+        logmasss0 * 1.d, e_logvcsp * 1.d, e_logmasssp * 1.d, e_logvcs0 * 1.d, $
+        e_logmasss0 * 1.d, /quiet, x0 = x0, guess = vmassguess, /latex)
 end
