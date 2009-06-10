@@ -64,16 +64,23 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int) eq 0 then e_int = 0.0
-    if n_elements(guess) ne 3 then guess = [1.0, 1.0, 1.0] else guess = float(guess)
-    if n_elements(x0) eq 0 then x0 = 0
-    if keyword_set(reduce) then e_int = 0.1
+    if n_elements(e_int) eq 0 then e_int = 0.d
+    if n_elements(guess) ne 3 then guess = [1.d, 1.d, 1.d] else $
+        guess = double(guess)
+    if n_elements(x0) eq 0 then x0 = 0.d
+    if keyword_set(reduce) then e_int = 0.1d
 
     ;---------------------------------------------------------------------------
-    ; RESCALE X-COORDS TO X0
+    ; RESCALE X-COORDS TO X0 AND CONVERT EVERYTHING TO DOUBLE PRECISION
     ;---------------------------------------------------------------------------
-    x1_ = x1 - x0
-    x2_ = x2 - x0
+    x1_ = double(x1) - x0
+    x2_ = double(x2) - x0
+    e_x1_ = double(e_x1)
+    e_x2_ = double(e_x2)
+    y1_ = double(y1)
+    y2_ = double(y2)
+    e_y1_ = double(e_y1)
+    e_y2_ = double(e_y2)
 
     ;---------------------------------------------------------------------------
     ; FIX SLOPE/LABEL PARAMETERS
@@ -94,10 +101,10 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ; CALL MPFIT ONCE
     ;---------------------------------------------------------------------------
     result = mpfit('parallellineresid', guess, functargs = {x1:x1_[ok1], $
-        y1:y1[ok1], x2:x2_[ok2], y2:y2[ok2], e_x1:e_x1[ok1], e_y1:e_y1[ok1], $
-        e_x2:e_x2[ok2], e_y2:e_y2[ok2], e_int:e_int}, parinfo = pi, $
-        status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
-        perror = perror, quiet = quiet)
+        y1:y1_[ok1], x2:x2_[ok2], y2:y2_[ok2], e_x1:e_x1_[ok1], $
+        e_y1:e_y1_[ok1], e_x2:e_x2_[ok2], e_y2:e_y2_[ok2], e_int:e_int}, $
+        parinfo = pi, status = status, errmsg = errmsg, bestnorm = minchi2, $
+        dof = dof, perror = perror, quiet = quiet)
     chired = sqrt(minchi2/dof)
     if ~keyword_set(quiet) then print, chired, e_int
     ;---------------------------------------------------------------------------
@@ -214,7 +221,7 @@ pro testmpfitexy2, ps = ps
     ; Fit the two samples individually using mpfitexy2
     fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
         dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
-        /quiet, /latex)
+        /quiet)
     print, "MPFITEXY2"
     print, "Fit = ", fit
     print, "Errors = ", errors
@@ -266,78 +273,4 @@ pro testmpfitexy2, ps = ps
     oplot, xrange, fit1[0] * xrange + fit1[1], linestyle = 2
     oplot, xrange, fit2[0] * xrange + fit2[1], linestyle = 2
     if keyword_set(ps) then closepsdev
-end
-
-;-------------------------------------------------------------------------------
-pro testmpfitexy2order, ps = ps, shufs0 = shufs0, shufsp = shufsp, old = old, $
-    rev = rev, srt = srt
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Code to test whether shuffling arrays makes a difference
-    ;---------------------------------------------------------------------------
-    
-    ;---------------------------------------------------------------------------
-    ; SETUP
-    ;---------------------------------------------------------------------------
-    ; Set up two samples of data.
-    s0 = ['NGC_0128', 'ESO_151G04', 'NGC_1381', 'NGC_1596', 'NGC_2310', $
-        'ESO_311G12', 'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', $
-        'ESO_597G36', 'NGC_1032', 'NGC_3957', 'NGC_5084']
-    sp = ['NGC_3390', 'PGC_44931', 'ESO_443G42', 'NGC_5746', 'IC_4767', $
-        'NGC_6722', 'ESO_185G53', 'IC_4937', 'IC_5096', 'ESO_240G11', $
-        'NGC_1886', 'NGC_4703', 'NGC_7123', 'IC_5176']
-
-    if keyword_set(rev) then begin
-        s0 = reverse(s0)
-        sp = reverse(sp)
-    endif
-
-    if keyword_set(srt) then begin
-        i = sort(s0)
-        s0 = s0[i]
-        j = sort(sp)
-        sp = sp[j]
-    endif
-
-    if keyword_set(old) then begin
-        ; Old galaxy order (FIX: this gives different answers for log mass fits,
-        ; and possibly others. This may be a bug in mpfitexy)
-        s0 = ['NGC_0128', 'NGC_1381', 'NGC_1596', 'NGC_2310', 'ESO_311G12', $
-                'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', 'ESO_597G36', $
-                'NGC_1032', 'NGC_3957', 'NGC_5084', 'ESO_151G04']
-        sp = ['NGC_3390', 'ESO_240G11', 'ESO_443G42', 'IC_4767', 'IC_4937', $
-                'IC_5096', 'IC_5176', 'NGC_1886', 'ESO_185G53', 'NGC_4703', $
-                'NGC_5746', 'NGC_6722', 'NGC_7123', 'PGC_44931']
-    endif
-
-    if keyword_set(shufs0) then begin
-        i = randperm(n_elements(s0))
-        s0 = s0[i]
-    endif
-    if keyword_set(shufsp) then begin
-        j = randperm(n_elements(sp))
-        sp = sp[j]
-    endif
-
-
-    ; Fix distance and apparent magnitude errors
-    fixderror = 0.0
-    fixapperror = 0.0
-    logmasssp = logmass(sp, error = e_logmasssp, fixapperror = fixapperror, $
-        fixderror = fixderror)
-    logmasss0 = logmass(s0, error = e_logmasss0, fixapperror = fixapperror, $
-        fixderror = fixderror)
-    ; Evaluate model circular velocity and error
-    vcsp = modelmeanvc(sp, error = e_vcsp)
-    logvcsp = alog10(vcsp)
-    e_logvcsp = e_vcsp/(vcsp * alog(10))
-    vcs0 = modelmeanvc(s0, error = e_vcs0)
-    logvcs0 = alog10(vcs0)
-    e_logvcs0 = e_vcs0/(vcs0 * alog(10))
-
-    x0 = 2.4
-    vmassguess = [3.0, 11.0, 0.2] * 1.d
-    logvc_logmass = mpfitexy2(logvcsp * 1.d, logmasssp * 1.d, logvcs0 * 1.d, $
-        logmasss0 * 1.d, e_logvcsp * 1.d, e_logmasssp * 1.d, e_logvcs0 * 1.d, $
-        e_logmasss0 * 1.d, /quiet, x0 = x0, guess = vmassguess, /latex)
 end
