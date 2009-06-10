@@ -101,7 +101,6 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
                 perror = perror, quiet = quiet)
             chired = sqrt(minchi2/dof)
             if ~keyword_set(quiet) then print, chired, e_int
-            stop
         endwhile
     endif
 
@@ -109,7 +108,7 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
 end
 
 ;-------------------------------------------------------------------------------
-pro testmpfitexy
+pro testmpfitexy, shuffle = shuffle
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Code to test mpfitexy2 and mpfitxy
@@ -141,6 +140,14 @@ pro testmpfitexy
         0.0457358, 0.0461065, 0.0563985, 0.0450141, 0.0479903, 0.0541895, $
         0.0601011, 0.0521960, 0.0512739, 0.0498970, 0.0448522, 0.0457561, $
         0.0708393, 0.0523630, 0.0460620, 0.0519679]
+    
+    if keyword_set(shuffle) then begin
+        i = randperm(n_elements(x))
+        x = x[i]
+        y = y[i]
+        e_x = e_x[i]
+        e_y = e_y[i]
+    endif
 
     ;---------------------------------------------------------------------------
     ; FITTING
@@ -151,7 +158,8 @@ pro testmpfitexy
     ;---------------------------------------------------------------------------
     ; Fit using MPFITEXY
     a = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors, $
-        minchi2 = minchi2, dof = dof, e_int = e_int, guess = [-9., -26.], /reduce)
+        minchi2 = minchi2, dof = dof, e_int = e_int, guess = [-9., -26.], $
+        /reduce, /quiet)
     print, "Fit = ", a
     print, "Errors = ", mpfiterrors
     print, "Reduced chi = ", sqrt(minchi2/dof), " for scatter ", e_int
@@ -180,4 +188,52 @@ pro testmpfitexy
     ;---------------------------------------------------------------------------
     oplot, !x.crange, c + d*(!x.crange - x0), color = fsc_color("Red"), $
         linestyle = 2, thick = 2
+end
+;-------------------------------------------------------------------------------
+pro testmpfitexyorder, ps = ps
+    ;---------------------------------------------------------------------------
+    ; PURPOSE
+    ; Code to test whether shuffling arrays makes a difference
+    ;---------------------------------------------------------------------------
+    
+    ;---------------------------------------------------------------------------
+    ; SETUP
+    ;---------------------------------------------------------------------------
+    ; Set up two samples of data.
+    s0 = ['NGC_0128', 'ESO_151G04', 'NGC_1381', 'NGC_1596', 'NGC_2310', $
+        'ESO_311G12', 'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', $
+        'ESO_597G36', 'NGC_1032', 'NGC_3957', 'NGC_5084']
+    sp = ['NGC_3390', 'PGC_44931', 'ESO_443G42', 'NGC_5746', 'IC_4767', $
+        'NGC_6722', 'ESO_185G53', 'IC_4937', 'IC_5096', 'ESO_240G11', $
+        'NGC_1886', 'NGC_4703', 'NGC_7123', 'IC_5176']
+
+;   ; Old galaxy order (FIX: this gives different answers for log mass fits,
+;   ; and possibly others. This may be a bug in mpfitexy)
+;   s0 = ['NGC_0128', 'NGC_1381', 'NGC_1596', 'NGC_2310', 'ESO_311G12', $
+;           'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', 'ESO_597G36', $
+;           'NGC_1032', 'NGC_3957', 'NGC_5084', 'ESO_151G04']
+;   sp = ['NGC_3390', 'ESO_240G11', 'ESO_443G42', 'IC_4767', 'IC_4937', $
+;           'IC_5096', 'IC_5176', 'NGC_1886', 'ESO_185G53', 'NGC_4703', $
+;           'NGC_5746', 'NGC_6722', 'NGC_7123', 'PGC_44931']
+
+    ; Fix distance and apparent magnitude errors
+    fixderror = 0.0
+    fixapperror = 0.0
+    logmasssp = logmass(sp, error = e_logmasssp, fixapperror = fixapperror, $
+        fixderror = fixderror) * 1.d
+    logmasss0 = logmass(s0, error = e_logmasss0, fixapperror = fixapperror, $
+        fixderror = fixderror) * 1.d
+    ; Evaluate model circular velocity and error
+    vcsp = modelmeanvc(sp, error = e_vcsp) * 1.d
+    logvcsp = alog10(vcsp) * 1.d
+    e_logvcsp = e_vcsp/(vcsp * alog(10))
+    vcs0 = modelmeanvc(s0, error = e_vcs0) * 1.d
+    logvcs0 = alog10(vcs0) * 1.d
+    e_logvcs0 = e_vcs0/(vcs0 * alog(10))
+
+    x0 = 2.4
+    vmassguess = [3.5, 11.0] * 1.d
+    print, mpfitexy([logvcsp, logvcs0], [logmasssp, logmasss0], $
+        [e_logvcsp, e_logvcs0], [e_logmasssp, e_logmasss0], /quiet)
+
 end
