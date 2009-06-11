@@ -56,15 +56,18 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int) eq 0 then e_int = 0.0
-    if n_elements(guess) eq 0 then guess = [0., 0.] else guess = float(guess)
-    if n_elements(x0) eq 0 then x0 = 0
-    if keyword_set(reduce) then e_int = mean(e_x)
+    if n_elements(e_int) eq 0 then e_int = 0.d
+    if n_elements(guess) eq 0 then guess = [0.d, 0.d] else guess = double(guess)
+    if n_elements(x0) eq 0 then x0 = 0.d
+    if keyword_set(reduce) then e_int = 0.1d
 
     ;---------------------------------------------------------------------------
     ; RESCALE X-COORDS TO X0
     ;---------------------------------------------------------------------------
-    x_ = x - x0
+    x_ = double(x) - x0
+    y_ = double(y)
+    e_x_ = double(e_x)
+    e_y_ = double(e_y)
 
     ;---------------------------------------------------------------------------
     ; FIX SLOPE/LABEL PARAMETERS
@@ -83,8 +86,8 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;---------------------------------------------------------------------------
     ; CALL MPFIT ONCE
     ;---------------------------------------------------------------------------
-    result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y[ok], $
-        e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, parinfo = pi, $
+    result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y_[ok], $
+        e_x:e_x_[ok], e_y:e_y_[ok], e_int:e_int}, parinfo = pi, $
         status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
         perror = perror, quiet = quiet)
     chired = sqrt(minchi2/dof)
@@ -165,8 +168,7 @@ pro testmpfitexy, shuffle = shuffle
     print, "Reduced chi = ", sqrt(minchi2/dof), " for scatter ", e_int
 
     ;---------------------------------------------------------------------------
-    ; Intrinsic scatter for chi-squared ~= 1.0
-    e_int = 0.45
+    ; Use intrinsic scatter found in MPFITEXY, /reduce
     fitexy, x - x0, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
         fitexyerrors, minchi2exy, qexy
     ; Reverse because fitexy returns parameters backwards
