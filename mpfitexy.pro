@@ -25,7 +25,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
-    fixint = fixint, x0 = x0, reduce = reduce
+    fixint = fixint, x0 = x0, reduce = reduce, inv = inv
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine straight line fit to data with errors in both
@@ -44,6 +44,9 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;                 sqrt(minchi2/dof) ~= 1.0
     ;        /fixint: fix the intercept to guess[0]
     ;        /reduce: adjust intrinsic scatter e_int to ensure chired ~= 1.0
+    ;           /inv: fits the inverse relation x = a' y + b' (still returns
+    ;                 slope of forward relation, i.e. slope = 1/a' and
+    ;                 intercept = -b'/a' 
     ;---------------------------------------------------------------------------
     ; OUTPUTS
     ;         errors: 1 sigma fitting errors in paramters slope and intercept.
@@ -57,7 +60,8 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ; DEFAULTS
     ;---------------------------------------------------------------------------
     if n_elements(e_int) eq 0 then e_int = 0.d
-    if n_elements(guess) eq 0 then guess = [0.d, 0.d] else guess = double(guess)
+    if n_elements(guess) eq 0 then guess_ = [1.d, 1.d] else $
+        guess_ = double(guess)
     if n_elements(x0) eq 0 then x0 = 0.d
     if keyword_set(reduce) then e_int = 0.1d
 
@@ -68,6 +72,22 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     y_ = double(y)
     e_x_ = double(e_x)
     e_y_ = double(e_y)
+
+    ;---------------------------------------------------------------------------
+    ; SWAP X AND Y AND INVERT GUESS IF FITTING INVERSE FUNCTION
+    ;---------------------------------------------------------------------------
+    if keyword_set(inv) then begin
+        xtemp = x_
+        e_xtemp = e_x_
+        x_ = y_
+        e_x_ = e_y_
+        y_ = xtemp
+        e_y_ = e_xtemp
+        forwardslopeguess = guess_[0]
+        forwardinterceptguess = guess_[1]
+        guess_[0] = 1 / forwardslopeguess
+        guess_[1] = - forwardinterceptguess/forwardslopeguess
+    endif
 
     ;---------------------------------------------------------------------------
     ; FIX SLOPE/LABEL PARAMETERS
@@ -81,12 +101,12 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;---------------------------------------------------------------------------
     ; CHECK ALL VALUES FINITE
     ;---------------------------------------------------------------------------
-    ok = where(finite(x_) and finite(y))
+    ok = where(finite(x_) and finite(y_))
 
     ;---------------------------------------------------------------------------
     ; CALL MPFIT ONCE
     ;---------------------------------------------------------------------------
-    result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y_[ok], $
+    result = mpfit('lineresid', guess_, functargs = {x:x_[ok], y:y_[ok], $
         e_x:e_x_[ok], e_y:e_y_[ok], e_int:e_int}, parinfo = pi, $
         status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
         perror = perror, quiet = quiet)
@@ -98,8 +118,8 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     if keyword_set(reduce) then begin
         while abs(chired - 1.) gt 0.01 do begin
             e_int = e_int * chired^(4./3)
-            result = mpfit('lineresid', guess, functargs = {x:x_[ok], y:y[ok], $
-                e_x:e_x[ok], e_y:e_y[ok], e_int:e_int}, parinfo = pi, $
+            result = mpfit('lineresid', guess_, functargs = {x:x_[ok], y:y_[ok], $
+                e_x:e_x_[ok], e_y:e_y_[ok], e_int:e_int}, parinfo = pi, $
                 status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
                 perror = perror, quiet = quiet)
             chired = sqrt(minchi2/dof)
@@ -107,6 +127,21 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
         endwhile
     endif
 
+    ;---------------------------------------------------------------------------
+    ; FLIP BEST-FITTING PARAMS AND THEIR ERRORS IF FITTING INVERSE FUNCTION
+    ; See PhD notes VIII.3 for derivation of error propagation
+    ;---------------------------------------------------------------------------
+    if keyword_set(inv) then begin
+        forwardslope = result[0]
+        forwardintercept = result[1]
+        forwardslopeerror = perror[0]
+        forwardintercepterror = perror[1]
+        result[0] = 1 / forwardslope
+        result[1] = - forwardintercept/forwardslope
+        perror[0] = forwardslopeerror / forwardslope^2
+        perror[1] = sqrt(forwardintercepterror^2 + $
+            (forwardintercept * forwardslopeerror/forwardslope)^2)/abs(forwardslope)
+    endif
     return, result
 end
 
@@ -190,52 +225,4 @@ pro testmpfitexy, shuffle = shuffle
     ;---------------------------------------------------------------------------
     oplot, !x.crange, c + d*(!x.crange - x0), color = fsc_color("Red"), $
         linestyle = 2, thick = 2
-end
-;-------------------------------------------------------------------------------
-pro testmpfitexyorder, ps = ps
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Code to test whether shuffling arrays makes a difference
-    ;---------------------------------------------------------------------------
-    
-    ;---------------------------------------------------------------------------
-    ; SETUP
-    ;---------------------------------------------------------------------------
-    ; Set up two samples of data.
-    s0 = ['NGC_0128', 'ESO_151G04', 'NGC_1381', 'NGC_1596', 'NGC_2310', $
-        'ESO_311G12', 'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', $
-        'ESO_597G36', 'NGC_1032', 'NGC_3957', 'NGC_5084']
-    sp = ['NGC_3390', 'PGC_44931', 'ESO_443G42', 'NGC_5746', 'IC_4767', $
-        'NGC_6722', 'ESO_185G53', 'IC_4937', 'IC_5096', 'ESO_240G11', $
-        'NGC_1886', 'NGC_4703', 'NGC_7123', 'IC_5176']
-
-;   ; Old galaxy order (FIX: this gives different answers for log mass fits,
-;   ; and possibly others. This may be a bug in mpfitexy)
-;   s0 = ['NGC_0128', 'NGC_1381', 'NGC_1596', 'NGC_2310', 'ESO_311G12', $
-;           'NGC_3203', 'NGC_4469', 'NGC_4710', 'NGC_6771', 'ESO_597G36', $
-;           'NGC_1032', 'NGC_3957', 'NGC_5084', 'ESO_151G04']
-;   sp = ['NGC_3390', 'ESO_240G11', 'ESO_443G42', 'IC_4767', 'IC_4937', $
-;           'IC_5096', 'IC_5176', 'NGC_1886', 'ESO_185G53', 'NGC_4703', $
-;           'NGC_5746', 'NGC_6722', 'NGC_7123', 'PGC_44931']
-
-    ; Fix distance and apparent magnitude errors
-    fixderror = 0.0
-    fixapperror = 0.0
-    logmasssp = logmass(sp, error = e_logmasssp, fixapperror = fixapperror, $
-        fixderror = fixderror) * 1.d
-    logmasss0 = logmass(s0, error = e_logmasss0, fixapperror = fixapperror, $
-        fixderror = fixderror) * 1.d
-    ; Evaluate model circular velocity and error
-    vcsp = modelmeanvc(sp, error = e_vcsp) * 1.d
-    logvcsp = alog10(vcsp) * 1.d
-    e_logvcsp = e_vcsp/(vcsp * alog(10))
-    vcs0 = modelmeanvc(s0, error = e_vcs0) * 1.d
-    logvcs0 = alog10(vcs0) * 1.d
-    e_logvcs0 = e_vcs0/(vcs0 * alog(10))
-
-    x0 = 2.4
-    vmassguess = [3.5, 11.0] * 1.d
-    print, mpfitexy([logvcsp, logvcs0], [logmasssp, logmasss0], $
-        [e_logvcsp, e_logvcs0], [e_logmasssp, e_logmasss0], /quiet)
-
 end
