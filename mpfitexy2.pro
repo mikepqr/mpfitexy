@@ -24,7 +24,7 @@ function parallellineresid, p, x1 = x1, y1 = y1, x2 = x2, y2 = y2, $
     f1 = slope * x1 + intercept
     f2 = slope * x2 + intercept + delta
 
-    if n_elements(e_int) eq 0 then e_int = 0.0
+    if n_elements(e_int) eq 0 then e_int = 0.d
     
     resid1 = (y1 - f1)/sqrt((e_y1^2 + slope^2 * e_x1^2 + e_int^2))
     resid2 = (y2 - f2)/sqrt((e_y2^2 + slope^2 * e_x2^2 + e_int^2))
@@ -57,6 +57,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;         errors: 1 sigma fitting errors in paramters slope, intercept and 
     ;                 delta. Dubious if sqrt(minchi2/dof) != 1.0
     ;        minchi2: chi-squared of final model
+    ;         chired: reduced chi of final model (should be ~= 1.0)
     ;            dof: degrees of freedom
     ;         return: best parameters of model: slope, intercept, delta
     ;---------------------------------------------------------------------------
