@@ -35,7 +35,7 @@ end
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
     quiet = quiet, e_int = e_int, chired = chired, x0 = x0, reduce = reduce, $
-    latex = latex, inv = inv
+    latex = latex, inv = inv, silent = silent
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine a common slope and two intercepts for two sets of
@@ -51,6 +51,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;                 can be fixed (see below). Default = [0.0, 0.0, 0.0]
     ;      /fixslope: fix the slope to guess[0] 
     ;         /quiet: Suppress MPFIT's text output
+    ;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
     ;         /latex: LaTeX output of fit params
     ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
     ;                 sqrt(minchi2/dof) ~= 1.0
@@ -112,7 +113,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         forwarddeltaguess = guess_[2]
         guess_[0] = 1 / forwardslopeguess
         guess_[1] = - forwardinterceptguess/forwardslopeguess
-        guess_[1] = - forwarddeltaguess/forwardslopeguess
+        guess_[2] = - forwarddeltaguess/forwardslopeguess
     endif
 
     ;---------------------------------------------------------------------------
@@ -137,9 +138,10 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         y1:y1_[ok1], x2:x2_[ok2], y2:y2_[ok2], e_x1:e_x1_[ok1], $
         e_y1:e_y1_[ok1], e_x2:e_x2_[ok2], e_y2:e_y2_[ok2], e_int:e_int}, $
         parinfo = pi, status = status, errmsg = errmsg, bestnorm = minchi2, $
-        dof = dof, perror = perror, quiet = quiet)
+        dof = dof, perror = perror, quiet = quiet, covar = covar)
     chired = sqrt(minchi2/dof)
     if ~keyword_set(quiet) then print, chired, e_int
+    if ~keyword_set(silent) and status ne 1 then print, status
 
     ;---------------------------------------------------------------------------
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
@@ -151,9 +153,10 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
                 y1:y1_[ok1], x2:x2_[ok2], y2:y2_[ok2], e_x1:e_x1_[ok1], $
                 e_y1:e_y1_[ok1], e_x2:e_x2_[ok2], e_y2:e_y2_[ok2], e_int:e_int}, $
                 parinfo = pi, status = status, errmsg = errmsg, bestnorm = minchi2, $
-                dof = dof, perror = perror, quiet = quiet)
+                dof = dof, perror = perror, quiet = quiet, covar = covar)
             chired = sqrt(minchi2/dof)
             if ~keyword_set(quiet) then print, chired, e_int
+            if ~keyword_set(silent) and status ne 1 then print, status
         endwhile
     endif
 
@@ -183,10 +186,13 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         result[1] = - forwardintercept/forwardslope
         result[2] = - forwarddelta/forwardslope
         perror[0] = forwardslopeerror / forwardslope^2
-        perror[1] = sqrt(forwardintercepterror^2 + $
-            (forwardintercept * forwardslopeerror/forwardslope)^2)/abs(forwardslope)
-        perror[2] = sqrt(forwarddeltaerror^2 + $
-            (forwarddelta * forwardslopeerror/forwardslope)^2)/abs(forwardslope)
+        perror[1] = sqrt(forwardintercepterror^2/forwardslope^2 + $
+            forwardslopeerror^2*forwardintercept^2/forwardslope^4 - $
+            2 * covar[0,1] * forwardintercept/forwardslope^3)
+        perror[2] = sqrt(forwarddeltaerror^2/forwardslope^2 + $
+            forwardslopeerror^2*forwarddelta^2/forwardslope^4 - $
+            2 * covar[0,2] * forwarddelta/forwardslope^3)
+        e_int = abs(e_int * result[0])
     endif
 
     if keyword_set(latex) then begin
@@ -194,14 +200,14 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         math = "$"
         pm = "\pm"
         newline = "\\ "
-        print, math, result[0], pm, perror[0], math, sep, $
-            math, result[1], pm, perror[1], math, sep, $
-            math, result[2], pm, perror[2], math, sep, $
+        print, math, result[0], math, sep, math, perror[0], math, sep, $
+            math, result[1], math, sep, math, perror[1], math, sep, $
+            math, result[2], math, sep, math, perror[2], math, sep, $
             chired, sep, $
             e_int, sep, $
             scatter, newline, $
-            format = '(A1,F5.2,A3,F5.2,A1,A2,A2,F8.2,A3,F5.2,A1,A2,A2,F5.2,' + $
-             'A3,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
+            format = '(A1,F5.2,A1,A1,A1,F5.2,A1,A2,A2,F8.2,A1,A1,A1,F5.2,' + $
+                'A1,A2,A2,F5.2,A1,A1,A1,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
     endif
     return, result
 end
@@ -281,7 +287,7 @@ pro testmpfitexy2, ps = ps
     print, "Fit = ", fit
     print, "Errors = ", errors
     print, "Reduced chi2 = ", sqrt(minchi2/dof), $
-        ", e_int for this reduced chi2 = ", e_int_reduced
+        ", e_int = ", e_int_reduced
     ;---------------------------------------------------------------------------
     ; Fit the two samples seperately, constrain the slope to be that found with
     ; mpfitexy2
@@ -334,7 +340,7 @@ end
 pro testmpfitexy2inv, ps = ps
     ;---------------------------------------------------------------------------
     ; PURPOSE
-    ; Code to test mpfitexy2 and mpfitxy
+    ; Code to test inverse fitting of mpfitexy2 and mpfitexy
     ;---------------------------------------------------------------------------
     
     ;---------------------------------------------------------------------------
@@ -369,7 +375,7 @@ pro testmpfitexy2inv, ps = ps
     x2 = x[sample2]
     y2 = y[sample2]
 
-    x0 = 2.4
+    x0 = 2.5
 
     e_x1 = e_x[sample1]
     e_y1 = e_y[sample1]
@@ -377,41 +383,46 @@ pro testmpfitexy2inv, ps = ps
     e_y2 = e_y[sample2]
 
     ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once, totally free, using MPFITEXY
-    fitall = mpfitexy(x, y, e_x, e_y, e_int = e_int1, errors = errorsall, $
-        /quiet, dof = dofall, minchi2 = minchi2all, guess = [-8.d, -4.d], x0 = x0, /reduce)
+    ; Fit the whole sample at once using MPFITEXY
     print, "# MPFITEXY"
+    fitall = mpfitexy(x, y, e_x, e_y, e_int = e_int1, errors = errorsall, $
+        /quiet, dof = dofall, minchi2 = minchi2all, guess = [-8.d, -26.d], $
+        x0 = x0, /reduce)
     print, "Fit = ", fitall
     print, "Errors = ", errorsall
     print, "Reduced chi2 = ", sqrt(minchi2all/dofall), ", e_int = ", e_int1
+    print, ""
     ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once, totally free, using MPFITEXY with inverse function
-    fitallinv = mpfitexy(x, y, e_x, e_y, e_int = e_int2, errors = errorsallinv, $
-        /quiet, dof = dofallinv, minchi2 = minchi2allinv, guess = [-8.d, -4.d], /inv, x0 = x0, /reduce)
+    ; Fit the whole sample at once, using MPFITEXY with inverse function
     print, "# MPFITEXY (inverse function)"
+    fitallinv = mpfitexy(x, y, e_x, e_y, e_int = e_int2, errors = errorsallinv, $
+        /quiet, dof = dofallinv, minchi2 = minchi2allinv, $
+        guess = [-8.d, -26.d], /inv, x0 = x0, /reduce)
     print, "Fit = ", fitallinv
     print, "Errors = ", errorsallinv
     print, "Reduced chi2 = ", sqrt(minchi2allinv/dofallinv), ", e_int = ", e_int2
+    print, ""
     ;---------------------------------------------------------------------------
     ; Fit the two samples individually using MPFITEXY2
+    print, "MPFITEXY2"
     fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
         dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
         /quiet)
-    print, "MPFITEXY2"
     print, "Fit = ", fit
     print, "Errors = ", errors
     print, "Reduced chi2 = ", sqrt(minchi2/dof), $
-        ", e_int for this reduced chi2 = ", e_int_reduced
+        ", e_int = ", e_int_reduced
+    print, ""
     ;---------------------------------------------------------------------------
     ; Fit the two samples individually using MPFITEXY2 with inverse function
-    fitinv = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errorsinv, $
-        dof = dofinv, minchi2 = minchi2inv, x0 = x0, /reduce, e_int = e_int_reducedinv, $
-        /inv, /quiet)
     print, "MPFITEXY2 (inverse)"
+    fitinv = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errorsinv, $
+        dof = dofinv, minchi2 = minchi2inv, x0 = x0, /reduce, $
+        e_int = e_int_reducedinv, /inv, /quiet)
     print, "Fit = ", fitinv
     print, "Errors = ", errorsinv
     print, "Reduced chi2 = ", sqrt(minchi2inv/dofinv), $
-        ", e_int for this reduced chi2 = ", e_int_reducedinv
+        ", e_int = ", e_int_reducedinv
     ;---------------------------------------------------------------------------
 
     ;---------------------------------------------------------------------------
