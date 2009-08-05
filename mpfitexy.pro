@@ -25,7 +25,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
-    fixint = fixint, x0 = x0, reduce = reduce, inv = inv
+    fixint = fixint, x0 = x0, reduce = reduce, inv = inv, silent = silent
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine straight line fit to data with errors in both
@@ -40,6 +40,7 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     ;                 (see below). Default = [0.0, 0.0, 0.0]
     ;      /fixslope: fix the slope to guess[0] 
     ;         /quiet: Suppress MPFIT's text output
+    ;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
     ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
     ;                 sqrt(minchi2/dof) ~= 1.0
     ;        /fixint: fix the intercept to guess[0]
@@ -109,9 +110,10 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     result = mpfit('lineresid', guess_, functargs = {x:x_[ok], y:y_[ok], $
         e_x:e_x_[ok], e_y:e_y_[ok], e_int:e_int}, parinfo = pi, $
         status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
-        perror = perror, quiet = quiet)
+        perror = perror, quiet = quiet, covar = covar)
     chired = sqrt(minchi2/dof)
     if ~keyword_set(quiet) then print, chired, e_int
+    if ~keyword_set(silent) and status ne 1 then print, status
     ;---------------------------------------------------------------------------
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
     ;---------------------------------------------------------------------------
@@ -121,9 +123,10 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
             result = mpfit('lineresid', guess_, functargs = {x:x_[ok], y:y_[ok], $
                 e_x:e_x_[ok], e_y:e_y_[ok], e_int:e_int}, parinfo = pi, $
                 status = status, errmsg = errmsg, bestnorm = minchi2, dof = dof, $
-                perror = perror, quiet = quiet)
+                perror = perror, quiet = quiet, covar = covar)
             chired = sqrt(minchi2/dof)
             if ~keyword_set(quiet) then print, chired, e_int
+            if ~keyword_set(silent) and status ne 1 then print, status
         endwhile
     endif
 
@@ -139,8 +142,10 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
         result[0] = 1 / forwardslope
         result[1] = - forwardintercept/forwardslope
         perror[0] = forwardslopeerror / forwardslope^2
-        perror[1] = sqrt(forwardintercepterror^2 + $
-            (forwardintercept * forwardslopeerror/forwardslope)^2)/abs(forwardslope)
+        perror[1] = sqrt(forwardintercepterror^2/forwardslope^2 + $
+            forwardslopeerror^2*forwardintercept^2/forwardslope^4 - $
+            2 * covar[0,1] * forwardintercept/forwardslope^3)
+        e_int = abs(e_int * result[0])
     endif
     return, result
 end
@@ -195,34 +200,95 @@ pro testmpfitexy, shuffle = shuffle
 
     ;---------------------------------------------------------------------------
     ; Fit using MPFITEXY
+    print, "### MPFITEXY, reduce for intrinsic scatter"
     a = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors, $
         minchi2 = minchi2, dof = dof, e_int = e_int, guess = [-9., -26.], $
         /reduce, /quiet)
     print, "Fit = ", a
     print, "Errors = ", mpfiterrors
     print, "Reduced chi = ", sqrt(minchi2/dof), " for scatter ", e_int
+    print, ""
 
     ;---------------------------------------------------------------------------
+    ; Fit using FITEXY
     ; Use intrinsic scatter found in MPFITEXY, /reduce
-    fitexy, x - x0, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + e_int^2), $
+    print, "### FITEXY, forward , adopt intrinsic scatter used in mpfitexy"
+    fitexy_e_int = e_int
+    fitexy, x - x0, y, c, d, x_sig = e_x, y_sig = sqrt(e_y^2 + fitexy_e_int^2), $
         fitexyerrors, minchi2exy, qexy
     ; Reverse because fitexy returns parameters backwards
-    print, [d, c], reverse(fitexyerrors), sqrt(minchi2exy/dof)
+    print, "Fit = ", [d, c]
+    print, "Errors = ", reverse(fitexyerrors)
+    print, "Reduced chi = ", sqrt(minchi2exy/dof), " for scatter ", fitexy_e_int
+    print, ""
+
+    ;---------------------------------------------------------------------------
+    ; Fit using MPFITEXY, /inv
+    print, "### MPFITEXY, /inv, reduce for intrinsic scatter"
+    a_inv = mpfitexy(x, y, e_x, e_y, x0 = x0, errors = mpfiterrors_inv, $
+        minchi2 = minchi2_inv, dof = dof, e_int = e_int_inv, $
+        guess = [-9., -26.], /reduce, /quiet, /inv)
+    print, "Fit = ", a_inv
+    print, "Errors = ", mpfiterrors_inv
+    print, "Reduced chi = ", sqrt(minchi2_inv/dof), " for scatter ", e_int_inv
+    print, ""
+
+    ;---------------------------------------------------------------------------
+    ; Fit using MPFITEXY
+    print, "### MPFITEXY, with x and y reversed, reduce for intrinsic scatter"
+    a = mpfitexy(y, x - x0, e_y, e_x, x0 = 0., errors = mpfiterrors, $
+        minchi2 = minchi2, dof = dof, e_int = e_int, guess = [-1/9., 26./9.], $
+        /reduce, /quiet)
+    print, "Fit = ", [1/a[0], -a[1]/a[0]]
+    print, "Errors (IGNORE) = ", mpfiterrors
+    print, "Reduced chi = ", sqrt(minchi2/dof), " for scatter ", e_int
+    print, ""
+
+    ;---------------------------------------------------------------------------
+    ; Fit using FITEXY
+    ; Use no intrinsic scatter
+    print, "### FITEXY, x and y swapped, no intrinsic scatter"
+    fitexy_e_int_inv = 0
+    fitexy, y, x - x0, c_inv, d_inv, x_sig = e_y, $
+        y_sig = sqrt(e_x^2 + fitexy_e_int_inv^2), $
+        fitexyerrors_inv, minchi2exy_inv, qexy_inv
+    print, "Fit = ", [1/d_inv, -c_inv/d_inv]
+    ; Convert errors in inverse to forward. FITEXY does not return full 
+    ; covariance matrix, so these derived errors are severely biased.
+    e_slope = fitexyerrors_inv[1]/d_inv^2
+    e_inter2 = fitexyerrors_inv[1]^2 * c_inv^2/d_inv^4 + $
+        fitexyerrors_inv[0]^2/d_inv^2
+    print, "Errors (BIASED) = ", [e_slope, sqrt(e_inter2)]
+    print, "Reduced chi = ", sqrt(minchi2exy_inv/dof), $
+        " for scatter ", fitexy_e_int_inv
 
     ;---------------------------------------------------------------------------
     ; PLOTTING
     ;---------------------------------------------------------------------------
     ; Plot data
     ;---------------------------------------------------------------------------
-    ploterror, x, y, e_x, e_y, psym = 1
+    xrange = [2.0, 2.5]
+    yrange = [-22, -26]
+    plot, xrange, yrange, yrange = yrange, /nodata
+    oploterror, x, y, e_x, e_y, psym = 1
     ;---------------------------------------------------------------------------
-    ; Plot fit from mpfitexy (thick blue line)
+    ; Plot fit from mpfitexy (blue line)
     ;---------------------------------------------------------------------------
     oplot, !x.crange, a[0]*(!x.crange - x0) + a[1], $
         color = fsc_color("Blue"), thick = 4
     ;---------------------------------------------------------------------------
+    ; Plot fit from mpfitexy (cyan line)
+    ;---------------------------------------------------------------------------
+    oplot, !x.crange, a_inv[0]*(!x.crange - x0) + a_inv[1], $
+        color = fsc_color("Cyan"), thick = 4
+    ;---------------------------------------------------------------------------
     ; Plot fit from fitexy (dashed red line)
     ;---------------------------------------------------------------------------
     oplot, !x.crange, c + d*(!x.crange - x0), color = fsc_color("Red"), $
-        linestyle = 2, thick = 2
+        thick = 2
+    ;---------------------------------------------------------------------------
+    ; Plot inverse fit from fitexy (dashed red line)
+    ;---------------------------------------------------------------------------
+    oplot, !x.crange, -c_inv/d_inv + (1/d_inv)*(!x.crange - x0), $
+        color = fsc_color("Brown"), thick = 2
 end
