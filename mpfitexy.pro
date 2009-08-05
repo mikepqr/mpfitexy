@@ -1,3 +1,62 @@
+;+
+; NAME:
+;   MPFITEXY
+;
+; AUTHOR:
+;   Michael Williams <mike@pentangle.net>, University of Oxford/ESO
+;
+; PURPOSE
+;   Uses MPFIT to determine straight line fit to data with errors in both
+;   variables using the weighting defined in Numerical Recipes, i.e. $
+;   emulates the ASTROIDL library function FITEXY with some bells and 
+;   whistles.
+; 
+; CALLING SEQUENCE:
+;  result = mpfitexy(x, y, e_x, e_y, e_int = e_int, x0 = x0, guess = guess, 
+;                    fixslope = fixslope, fixint = fixint, quiet = quiet,
+;                    silent = silent, reduce = reduce, inv = inv, dof = dof,
+;                    errors = errors, minchi2 = minchi2)
+;
+; INPUTS:
+;           x, y: independent and dependent variables
+;       e_x, e_y: corresponding error bars
+;             x0: fit the relationship y = a(x - x0) + b
+;          guess: starting points for slope, intercept Slope can be fixed 
+;                 (see below). Default = [0.0, 0.0, 0.0]
+;      /fixslope: fix the slope to guess[0] 
+;         /quiet: Suppress MPFIT's text output
+;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
+;          e_int: intrinsic scatter in data. Should be adjusted to ensure
+;                 sqrt(minchi2/dof) ~= 1.0
+;        /fixint: fix the intercept to guess[0]
+;        /reduce: adjust intrinsic scatter e_int to ensure chired ~= 1.0
+;           /inv: fits the inverse relation x = a' y + b' (still returns
+;                 slope of forward relation, i.e. slope = 1/a' and
+;                 intercept = -b'/a' 
+;
+; OUTPUTS:
+;         errors: 1 sigma fitting errors in paramters slope and intercept.
+;                 Dubious if sqrt(minchi2/dof) != 1.0
+;        minchi2: chi-squared of final model
+;            dof: degrees of freedom
+;         return: best parameters of model: slope, intercept
+;
+; KNOWN ISSUES:
+; Vulnerable to rounding errors if input data and errors are not prenormalized.
+; 
+;-
+; MODIFICATION HISTORY:
+; Pre-2009.08 - Initial private releases
+;  2009.08.05 - Correctly propagate covariance term into intercept error after 
+;               inverse fit (thanks to Tim Davis, Universiy of Oxford)
+;- 
+; Copyright (C) 2009, Michael Williams <mike@pentangle.net>
+; This software is provided as is without any warranty whatsoever. Permission 
+; to use, copy, modify, and distribute modified or unmodified copies is 
+; granted, provided this copyright notice and disclaimer are included unchanged.
+; All other rights reserved.
+;-
+
 ;-------------------------------------------------------------------------------
 function lineresid, p, x = x, y = y, e_x = e_x, e_y = e_y, e_int = e_int
     ;---------------------------------------------------------------------------
@@ -26,37 +85,6 @@ end
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
     fixint = fixint, x0 = x0, reduce = reduce, inv = inv, silent = silent
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Uses MPFIT to determine straight line fit to data with errors in both
-    ; variables using the weighting defined in Numerical Recipes, i.e. emulates
-    ; the ASTROIDL library function FITEXY.
-    ;---------------------------------------------------------------------------
-    ; INPUTS
-    ;           x, y: independent and dependent variables
-    ;       e_x, e_y: corresponding error bars
-    ;             x0: fit the relationship y = a(x - x0) + b
-    ;          guess: starting points for slope, intercept Slope can be fixed 
-    ;                 (see below). Default = [0.0, 0.0, 0.0]
-    ;      /fixslope: fix the slope to guess[0] 
-    ;         /quiet: Suppress MPFIT's text output
-    ;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
-    ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
-    ;                 sqrt(minchi2/dof) ~= 1.0
-    ;        /fixint: fix the intercept to guess[0]
-    ;        /reduce: adjust intrinsic scatter e_int to ensure chired ~= 1.0
-    ;           /inv: fits the inverse relation x = a' y + b' (still returns
-    ;                 slope of forward relation, i.e. slope = 1/a' and
-    ;                 intercept = -b'/a' 
-    ;---------------------------------------------------------------------------
-    ; OUTPUTS
-    ;         errors: 1 sigma fitting errors in paramters slope and intercept.
-    ;                 Dubious if sqrt(minchi2/dof) != 1.0
-    ;        minchi2: chi-squared of final model
-    ;            dof: degrees of freedom
-    ;         return: best parameters of model: slope, intercept
-    ;---------------------------------------------------------------------------
-
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
