@@ -164,10 +164,10 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ; EVALUATE TOTAL SCATTER (see Bedregal et al. 2006, eqn. 18 or Verheijen
     ; et al. 2001, section 7)
     ;---------------------------------------------------------------------------
-    w1 = 1/(e_y1[ok1]^2 + result[0]^2 * e_x1[ok1]^2 + e_int^2)
-    w2 = 1/(e_y2[ok2]^2 + result[0]^2 * e_x2[ok2]^2 + e_int^2)
-    numerator = total(w1 * (y1[ok1] - (result[0] * x1_[ok1] + result[1]))^2) + $
-        total(w2 * (y2[ok2] - (result[0] * x2_[ok2] + result[1] + result[2]))^2)
+    w1 = 1/(e_y1_[ok1]^2 + result[0]^2 * e_x1_[ok1]^2 + e_int^2)
+    w2 = 1/(e_y2_[ok2]^2 + result[0]^2 * e_x2_[ok2]^2 + e_int^2)
+    numerator = total(w1 * (y1_[ok1] - (result[0] * x1_[ok1] + result[1]))^2) + $
+        total(w2 * (y2_[ok2] - (result[0] * x2_[ok2] + result[1] + result[2]))^2)
     denominator = total(w1) + total(w2)
     scatter = sqrt(numerator/denominator)
 
@@ -193,6 +193,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
             forwardslopeerror^2*forwarddelta^2/forwardslope^4 - $
             2 * covar[0,2] * forwarddelta/forwardslope^3)
         e_int = abs(e_int * result[0])
+        scatter = abs(scatter * result[0])
     endif
 
     if keyword_set(latex) then begin
@@ -206,7 +207,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
             chired, sep, $
             e_int, sep, $
             scatter, newline, $
-            format = '(A1,F5.2,A1,A1,A1,F5.2,A1,A2,A2,F8.2,A1,A1,A1,F5.2,' + $
+            format = '(A1,F6.2,A1,A1,A1,F5.2,A1,A2,A2,F8.2,A1,A1,A1,F5.2,' + $
                 'A1,A2,A2,F5.2,A1,A1,A1,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
     endif
     return, result
@@ -407,7 +408,7 @@ pro testmpfitexy2inv, ps = ps
     print, "MPFITEXY2"
     fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
         dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
-        /quiet)
+        /quiet, /latex)
     print, "Fit = ", fit
     print, "Errors = ", errors
     print, "Reduced chi2 = ", sqrt(minchi2/dof), $
