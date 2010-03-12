@@ -83,12 +83,13 @@ function lineresid, p, x = x, y = y, e_x = e_x, e_y = e_y, e_int = e_int
 end
 ;-------------------------------------------------------------------------------
 function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
-    guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int, $
-    fixint = fixint, x0 = x0, reduce = reduce, inv = inv, silent = silent
+    guess = guess, minchi2 = minchi2, dof = dof, quiet = quiet, e_int = e_int1, $
+    fixint = fixint, x0 = x0, reduce = reduce, inv = inv, silent = silent, $
+    chired = chired, latex = latex
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int) eq 0 then e_int = 0.d
+    if n_elements(e_int) eq 0 then e_int = 0.d else e_int = e_int1
     if n_elements(guess) eq 0 then guess_ = [1.d, 1.d] else $
         guess_ = double(guess)
     if n_elements(x0) eq 0 then x0 = 0.d
@@ -159,6 +160,15 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
     endif
 
     ;---------------------------------------------------------------------------
+    ; EVALUATE TOTAL SCATTER (see Bedregal et al. 2006, eqn. 18 or Verheijen
+    ; et al. 2001, section 7)
+    ;---------------------------------------------------------------------------
+    w = 1/(e_y_[ok]^2 + result[0]^2 * e_x_[ok]^2 + e_int^2)
+    numerator = total(w * (y_[ok] - (result[0] * x_[ok] + result[1]))^2)
+    denominator = total(w)
+    scatter = sqrt(numerator/denominator)
+
+    ;---------------------------------------------------------------------------
     ; FLIP BEST-FITTING PARAMS AND THEIR ERRORS IF FITTING INVERSE FUNCTION
     ; See PhD notes VIII.3 for derivation of error propagation
     ;---------------------------------------------------------------------------
@@ -174,6 +184,21 @@ function mpfitexy, x, y, e_x, e_y, fixslope = fixslope, errors = perror, $
             forwardslopeerror^2*forwardintercept^2/forwardslope^4 - $
             2 * covar[0,1] * forwardintercept/forwardslope^3)
         e_int = abs(e_int * result[0])
+        scatter = abs(scatter * result[0])
+    endif
+
+    if keyword_set(latex) then begin
+        sep = "&"
+        math = "$"
+        pm = "\pm"
+        newline = "\\ "
+        print, math, result[0], math, sep, math, perror[0], math, sep, $
+            math, result[1], math, sep, math, perror[1], math, sep, $
+            chired, sep, $
+            e_int, sep, $
+            scatter, newline, $
+            format = '(A1,F6.2,A1,A1,A1,F5.2,A1,A2,A2,F8.2,A1,A1,A1,F5.2,' + $
+                'A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
     endif
     return, result
 end
