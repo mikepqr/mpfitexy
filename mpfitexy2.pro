@@ -34,7 +34,7 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int = e_int, chired = chired, x0 = x0, reduce = reduce, $
+    quiet = quiet, e_int = e_int1, chired = chired, x0 = x0, reduce = reduce, $
     latex = latex, inv = inv, silent = silent
     ;---------------------------------------------------------------------------
     ; PURPOSE
@@ -71,7 +71,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int) eq 0 then e_int = 0.d
+    if n_elements(e_int1) eq 0 then e_int = 0.d else e_int = e_int1
     if n_elements(guess) ne 3 then guess_ = [1.d, 1.d, 1.d] else $
         guess_ = double(guess)
     if n_elements(x0) eq 0 then x0 = 0.d
@@ -147,7 +147,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         print, "chi-squared already less than 1.0. Not attempting to adjust e_int."
         print, chired
         reduce1 = 0
-    endif else if chired ge 1.0 and keyword_set(reduce) then begin
+    endif else if abs(chired -1.)  ge 0.01 and keyword_set(reduce) then begin
         reduce1 = 1 
     endif else reduce1 = 0
 
@@ -155,7 +155,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
     ;---------------------------------------------------------------------------
     if keyword_set(reduce1) then begin
-        e_int = 0.1
+        e_int = mean([e_y1_, e_y2_])/10.
         while abs(chired - 1.) gt 0.01 do begin
             e_int = e_int * chired^(4./3)
             result = mpfit('parallellineresid', guess_, functargs = {x1:x1_[ok1], $
