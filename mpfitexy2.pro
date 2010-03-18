@@ -34,8 +34,9 @@ end
 ;-------------------------------------------------------------------------------
 function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int = e_int1, chired = chired, x0 = x0, reduce = reduce, $
-    latex = latex, inv = inv, silent = silent
+    quiet = quiet, e_int_guess = e_int_guess, chired = chired, x0 = x0, $
+    reduce = reduce, latex = latex, inv = inv, silent = silent, $
+    e_int_reduce = e_int_reduce, scatter = scatter
     ;---------------------------------------------------------------------------
     ; PURPOSE
     ; Uses MPFIT to determine a common slope and two intercepts for two sets of
@@ -53,7 +54,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;         /quiet: Suppress MPFIT's text output
     ;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
     ;         /latex: LaTeX output of fit params
-    ;          e_int: intrinsic scatter in data. Should be adjusted to ensure
+    ;    e_int_guess: intrinsic scatter in data. Should be adjusted to ensure
     ;                 sqrt(minchi2/dof) ~= 1.0
     ;           /inv: fit the inverse functions 
     ;                   x1 = a' y1 + b' 
@@ -65,13 +66,17 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;        minchi2: chi-squared of final model
     ;         chired: reduced chi of final model (should be ~= 1.0)
     ;            dof: degrees of freedom
-    ;         return: best parameters of model: slope, intercept, delta
+    ;   e_int_reduce: intrinsic scatter found by optimization (will only differ
+    ;                 from e_int_guess if called with /reduce keyword)
+    ;        scatter: total scatter (~ average distance from points from lines
+    ;                 in units of y)
+    ;         result: best parameters of model: slope, intercept, delta
     ;---------------------------------------------------------------------------
 
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
-    if n_elements(e_int1) eq 0 then e_int = 0.d else e_int = e_int1
+    if n_elements(e_int_guess) eq 0 then e_int = 0.d else e_int = e_int_guess
     if n_elements(guess) ne 3 then guess_ = [1.d, 1.d, 1.d] else $
         guess_ = double(guess)
     if n_elements(x0) eq 0 then x0 = 0.d
@@ -219,6 +224,9 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
             format = '(A1,F6.2,A1,A1,A1,F5.2,A1,A2,A2,F8.2,A1,A1,A1,F5.2,' + $
                 'A1,A2,A2,F5.2,A1,A1,A1,F5.2,A1,A2,F5.2,A2,F5.2,A2,F5.2,A4)'
     endif
+
+    e_int_reduce = e_int
+
     return, result
 end
 
