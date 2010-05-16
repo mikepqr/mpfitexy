@@ -1,3 +1,111 @@
+;+
+; NAME:
+;   MPFITEXY2
+;
+; AUTHOR:
+;   Michael Williams <mike@pentangle.net>, University of Oxford/ESO
+;
+; PURPOSE
+;   Uses MPFIT to determine a common slope and two intercepts for two sets of
+;   data. Uses the method of Williams (2010), i.e. minimizes that paper's
+;   Equation 3 (or Equation 8 if called with /inv).
+;                     y1 = a x1 + b 
+;                     y2 = a x2 + b + d
+;   MPFITEXY2 returns the array [a, b, d]
+;
+;   MPFITEXY2 is an implementation of the minimization described in Section 
+;   4 of Williams M.J., Bureau M., Cappellari M., 2010, MNRAS (submitted). You 
+;   should read to that short section before using the code. You may also wish 
+;   to refer to Willick (1994) for more information on the significance of 
+;   fitting the inverse relationship (a feature enabled by using the /inv 
+;   keyword), and Tremaine et al. (2002) and/or Gultekin et al. (2009) for 
+;   background on the role of intrinsic scatter.
+;
+;   The /reduce keyword, which adjusts the intrinsic scatter to ensure the 
+;   reduced chi^2 is ~= 1.0 uses the iterative procedure described in Section 
+;   3.2.1 of Bedregal et al. 2006.
+;
+;   If you find MPFITEXY2 useful, please cite the following paper:
+;     Williams, Bureau & Cappellari, 2010, MNRAS (submitted)
+;   and, if possible, refer to the URL
+;     <http://purl.org/mike/mpfitexy/> 
+;   where the code can be found. 
+;
+;   MPFITEXY2 is dependent on the MPFIT package, which should also be
+;   acknowledged by citing:
+;     Markwardt C. B., 2008, in Astronomical Data Analysis Software and
+;     Systems XVIII, Bohlender, D., Dowler P., Durand D., eds.,
+;     Astronomical Society of the Pacific Conference Series.
+;     [http://adsabs.harvard.edu/abs/2009ASPC..411..251M]
+; 
+; CALLING SEQUENCE:
+;  result = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, x0 = x0, 
+;       guess = guess, e_int_guess = e_int_guess, /fixslope, /fixint, /reduce, 
+;       /inv, /quiet, /silent, /latex, errors = perror, minchi2 = minchi2, $
+;       dof = dof, e_int_reduce = e_int_reduce, scatter = scatter
+;
+; INPUTS:
+; x1, y1, x2, y2: independent and dependent variables [required]. Note order.
+;                 Non-finite values are silently ignored.
+;    e_x1, etc. : corresponding error bars [required]
+;                 Must be non-zero.
+;
+;             x0: fit the relationships 
+;                   y = a(x - x0) + b, 
+;                   y = a(x - x0) + b + d.
+;                 Default: x0 = 0.
+;          guess: starting point guesses for [slope, intercept, offset].
+;                 fixed (see below). Default = [1., 1., 1.]
+;    e_int_guess: intrinsic scatter in data in units of y1, y2. For fit and 
+;                 errors to be meaningful, this quantity should be adjusted 
+;                 to ensure sqrt(minchi2/dof) ~= 1.0. This can be done either by
+;                 manually adjusting e_int_guess, or by using the /reduce 
+;                 keyword, which will adjust the intrinsic scatter.
+;
+;      /fixslope: fix the slope to guess[0]. Cannot be used with fixint.
+;        /fixint: fix the intercept to guess[1]. Cannot be used with fixslope.
+;        /reduce: adjust intrinsic scatter e_int to ensure chired ~= 1.0
+;           /inv: fits the inverse relation x = a' y + b' (still returns
+;                 slope of forward relation, i.e. slope = 1/a' and
+;                 intercept = -b'/a'. Output variables (slope, intercept, 
+;                 errors, etc.) are returned for the forward relation.
+;                 See Section 4 of Williams et al. (2010) for details.
+;         /quiet: Suppress MPFIT's text output
+;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
+;         /latex: Print result and errors in LaTeX table format
+;
+; OUTPUTS:
+;         result: three-element array containing best parameters of model: 
+;                 [slope, intercept, offset]
+;         errors: 1-sigma fitting errors in slope, intercept and offset.
+;                 Not meaningful if sqrt(minchi2/dof) != 1.0 (which implies
+;                 observation uncertainties and/or intrinsic scatter not
+;                 well-estimated) or if used with /fixint or /fixslope.
+;        minchi2: unreduced chi-squared of final model
+;            dof: degrees of freedom
+;   e_int_reduce: Intrinsic scatter used to ensure sqrt(minchi2/dof) ~= 1.
+;        scatter: "Total" scatter, i.e. RMS distance of points from model.
+;                 The e_int_reduce/scatter gives a useful idea of what 
+;                 fraction of the scatter is observational and what is 
+;                 intrinsic.
+;
+; KNOWN ISSUES:
+; Vulnerable to rounding errors if input data are not prenormalized.
+; 
+;-
+; MODIFICATION HISTORY:
+; Pre-2009.08 - Initial private releases
+;  2009.08.05 - Correctly propagate covariance term into intercept error after 
+;               inverse fit (thanks to Tim Davis, University of Oxford)
+;  2010.05.15 - Initial public release (v1.0, hg revision 24)
+;- 
+; Copyright (C) 2009-2010, Michael Williams <mike@pentangle.net>
+; This software is provided as is without any warranty whatsoever. Permission 
+; to use, copy, modify, and distribute modified or unmodified copies is 
+; granted, provided this copyright notice and disclaimer are included unchanged.
+; All other rights reserved.
+;-
+
 ;-------------------------------------------------------------------------------
 function parallellineresid, p, x1 = x1, y1 = y1, x2 = x2, y2 = y2, $
     e_x1 = e_x1, e_y1 = e_y1, e_x2 = e_x2, e_y2 = e_y2, e_int = e_int
@@ -16,7 +124,7 @@ function parallellineresid, p, x1 = x1, y1 = y1, x2 = x2, y2 = y2, $
     ;                 two samples.
     ;---------------------------------------------------------------------------
     ; OUTPUT
-    ; Residual of data from models with these data and choice of paramters
+    ; Residual of data from models with these data and choice of parameters
     ;---------------------------------------------------------------------------
     slope = p[0]
     intercept = p[1]
@@ -32,47 +140,11 @@ function parallellineresid, p, x1 = x1, y1 = y1, x2 = x2, y2 = y2, $
     return, [resid1, resid2]
 end
 ;-------------------------------------------------------------------------------
-function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
-    fixslope = fixslope, errors = perror, dof = dof, minchi2 = minchi2, $
-    quiet = quiet, e_int_guess = e_int_guess, chired = chired, x0 = x0, $
-    reduce = reduce, latex = latex, inv = inv, silent = silent, $
-    e_int_reduce = e_int_reduce, scatter = scatter
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Uses MPFIT to determine a common slope and two intercepts for two sets of
-    ; data. Uses the method of Bureau (1996), i.e. minimizes their Equation (3).
-    ;                   y1 = a x1 + b 
-    ;                   y2 = a x2 + b + d
-    ;---------------------------------------------------------------------------
-    ; INPUTS
-    ; x1, y1, x2, y2: independent and dependent variables for two samples
-    ;     e_x1, etc.: corresponding error bars
-    ;          guess: starting points for common slope, intercept of sample 1, 
-    ;                 difference between intercepts of the two samples. Slope
-    ;                 can be fixed (see below). Default = [0.0, 0.0, 0.0]
-    ;      /fixslope: fix the slope to guess[0] 
-    ;         /quiet: Suppress MPFIT's text output
-    ;        /silent: Do not print MPFIT status code (see mpfit.pro for docs)
-    ;         /latex: LaTeX output of fit params
-    ;    e_int_guess: intrinsic scatter in data. Should be adjusted to ensure
-    ;                 sqrt(minchi2/dof) ~= 1.0
-    ;           /inv: fit the inverse functions 
-    ;                   x1 = a' y1 + b' 
-    ;                   x2 = a' y2 + b' + d'
-    ;---------------------------------------------------------------------------
-    ; OUTPUTS
-    ;         errors: 1 sigma fitting errors in paramters slope, intercept and 
-    ;                 delta. Dubious if sqrt(minchi2/dof) != 1.0
-    ;        minchi2: chi-squared of final model
-    ;         chired: reduced chi of final model (should be ~= 1.0)
-    ;            dof: degrees of freedom
-    ;   e_int_reduce: intrinsic scatter found by optimization (will only differ
-    ;                 from e_int_guess if called with /reduce keyword)
-    ;        scatter: total scatter (~ average distance from points from lines
-    ;                 in units of y)
-    ;         result: best parameters of model: slope, intercept, delta
-    ;---------------------------------------------------------------------------
-
+function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, x0 = x0, $
+    guess = guess, fixslope = fixslope, fixint = fixint, $
+    e_int_guess = e_int_guess, reduce = reduce, inv = inv, quiet = quiet, $
+    silent = silent, latex = latex, errors = perror, minchi2 = minchi2, $
+    dof = dof, e_int_reduce = e_int_reduce, scatter = scatter
     ;---------------------------------------------------------------------------
     ; DEFAULTS
     ;---------------------------------------------------------------------------
@@ -80,7 +152,8 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     if n_elements(guess) ne 3 then guess_ = [1.d, 1.d, 1.d] else $
         guess_ = double(guess)
     if n_elements(x0) eq 0 then x0 = 0.d
-    if keyword_set(reduce) then e_int = 0.0d
+    if keyword_set(fixint) and keyword_set(fixslope) then $
+        message, "MPFITEXY cannot be used with both fixint and fixslope"
 
     ;---------------------------------------------------------------------------
     ; RESCALE X-COORDS TO X0 AND CONVERT EVERYTHING TO DOUBLE PRECISION
@@ -126,6 +199,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     ;---------------------------------------------------------------------------
     pi = replicate({fixed:0, limited:[0,0], limits:[0.D,0.D], parname:''},3)
     if keyword_set(fixslope) then pi(0).fixed = 1
+    if keyword_set(fixint) then pi(1).fixed = 1
     pi(0).parname = '    Slope'
     pi(1).parname = 'Intercept'
     pi(2).parname = '    Delta'
@@ -146,13 +220,13 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
         dof = dof, perror = perror, quiet = quiet, covar = covar)
     chired = sqrt(minchi2/dof)
     if ~keyword_set(quiet) then print, chired, e_int
-    if ~keyword_set(silent) and status ne 1 then print, status
+    if ~keyword_set(silent) and status ne 1 then print, "MPFIT error: ", status
 
     if chired lt 1.0 and keyword_set(reduce) then begin
         print, "chi-squared already less than 1.0. Not attempting to adjust e_int."
         print, chired
         reduce1 = 0
-    endif else if abs(chired -1.)  ge 0.01 and keyword_set(reduce) then begin
+    endif else if abs(chired -1.) ge 0.01 and keyword_set(reduce) then begin
         reduce1 = 1 
     endif else reduce1 = 0
 
@@ -226,251 +300,5 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, guess = guess, $
     endif
 
     e_int_reduce = e_int
-
     return, result
-end
-
-;-------------------------------------------------------------------------------
-pro testmpfitexy2, ps = ps
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Code to test mpfitexy2 and mpfitxy
-    ;---------------------------------------------------------------------------
-    
-    ;---------------------------------------------------------------------------
-    ; SETUP
-    ;---------------------------------------------------------------------------
-    ; Set up two samples of data. Populate sample 1 with smaller values
-    x = [2.43184, 2.34696, 2.21818, 2.23748, 2.16919, 2.12780, 2.15438, $
-        2.24805, 2.29982, 2.14897, 2.17739, 2.22395, 2.12592, 2.44776, $
-        2.19388, 2.37343, 2.39492, 2.23249, 2.17179, 2.40253, 2.38844, $
-        2.37377, 2.22880, 2.21212, 2.26511, 2.32707, 2.33750, 2.15525]
-    y = [-25.3406, -24.8878, -22.6971, -22.8706, -22.7128, -22.4252, -22.9278, $
-        -23.8840, -24.7333, -23.0504, -23.5204, -24.0678, -23.0894, -25.5364, $
-        -23.5926, -25.3422, -25.0512, -24.2071, -24.1777, -25.1833, -24.8495, $
-        -24.5180, -24.4620, -23.2211, -25.2567, -24.8611, -25.2406, -23.2333]
-    e_x = [0.00571056, 0.0249614, 0.00348239, 0.0192876, 0.0228633, $
-        0.00863316, 0.0357660, 0.00380802, 0.00545385, 0.00564655, $
-        0.00300506, 0.0340787, 0.0335453, 0.00403909, 0.0522591, $
-        0.0109578, 0.00863588, 0.0209927, 0.0510806, 0.0656906, 0.0100137, $
-        0.00491871, 0.0204541, 0.00346392, 0.0107160, 0.00327621, $
-        0.00947749, 0.0233549]
-    e_y = [0.0434049, 0.0429708, 0.208040, 0.159271, 0.0503973, 0.103848, $
-        0.0504721, 0.0643180, 0.0422348, 0.0273715, 0.0239415, 0.0999366, $
-        0.0457358, 0.0461065, 0.0563985, 0.0450141, 0.0479903, 0.0541895, $
-        0.0601011, 0.0521960, 0.0512739, 0.0498970, 0.0448522, 0.0457561, $
-        0.0708393, 0.0523630, 0.0460620, 0.0519679]
-
-    sample1 = where(y ge -8.3 * x - 5.4)
-    sample2 = where(y lt -8.3 * x - 5.4)
-
-    x1 = x[sample1]
-    y1 = y[sample1]
-    x2 = x[sample2]
-    y2 = y[sample2]
-
-    x0 = 2.5
-
-    e_x1 = e_x[sample1]
-    e_y1 = e_y[sample1]
-    e_x2 = e_x[sample2]
-    e_y2 = e_y[sample2]
-
-    ;---------------------------------------------------------------------------
-    ; FITTING
-    ;---------------------------------------------------------------------------
-    ; Intrinsic scatter ~= 0.25 mag found to give sqrt(chi2/DOF) ~= 1.0
-    e_int = 0.25
-    ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once, totally free, using FITEXY
-    fitexy, x, y, a, b, x_sig = e_x, y_sig = e_y, fitexyerrors, minchi2exy
-    print, "# FIT ALL (FITEXY, no intrinsic error)"
-    print, "Fit = ", b, a
-    print, "Errors = ", reverse(fitexyerrors)
-    print, "Reduced chi2 = ", sqrt(minchi2exy/(n_elements(x1) + n_elements(x2) - 2))
-    ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once, totally free, using MPFITEXY
-    fitall = mpfitexy(x, y, e_x, e_y, e_int = 0., errors = errorsall, $
-        /quiet, dof = dofall, minchi2 = minchi2all)
-    print, "# FIT ALL (MPFITEXY, no intrinsic error)"
-    print, "Fit = ", fitall
-    print, "Errors = ", errorsall
-    print, "Reduced chi2 = ", sqrt(minchi2all/dofall)
-    ;---------------------------------------------------------------------------
-    ; Fit the two samples individually using mpfitexy2
-    fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
-        dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
-        /quiet)
-    print, "MPFITEXY2"
-    print, "Fit = ", fit
-    print, "Errors = ", errors
-    print, "Reduced chi2 = ", sqrt(minchi2/dof), $
-        ", e_int = ", e_int_reduced
-    ;---------------------------------------------------------------------------
-    ; Fit the two samples seperately, constrain the slope to be that found with
-    ; mpfitexy2
-    fit1 = mpfitexy(x1, y1, e_x1, e_y1, guess = [fit[0], 0.], /fixslope, $
-        errors = errors1, dof = dof1, minchi2 = minchi21, e_int = e_int, /quiet)
-    fit2 = mpfitexy(x2, y2, e_x2, e_y2, guess = [fit[0], 0.], /fixslope, $
-        errors = errors2, dof = dof2, minchi2 = minchi22, e_int = e_int, /quiet)
-    print, "MPFITEXY of two samples with fixed slope " + strtrim(fit[0], 2)
-    print, "Fits = ", fit1, fit2
-    print, "Errors = ", errors1, errors2
-    print, "Reduced chi2s = ", sqrt(minchi21/dof1), sqrt(minchi22/dof2)
-    ;---------------------------------------------------------------------------
-
-    ;---------------------------------------------------------------------------
-    ; PLOTTING
-    ;---------------------------------------------------------------------------
-    if keyword_set(ps) then begin
-        openpsdev, file = '~/Desktop/mpfitexy2.ps', /mnras, xsize = 13, $
-            ysize = 10
-        !x.margin = [5, 1]
-        !y.margin = [3, 1]
-    endif
-
-    color1 = fsc_color("Red")
-    color2 = fsc_color("Blue")
-    xrange = [2, 2.6]
-    yrange = [-22, -26]
-
-    ;---------------------------------------------------------------------------
-    ; Plot data
-    plot, xrange, yrange, yrange = yrange, /nodata, /xstyle, /ystyle
-    oploterror, x1, y1, e_x1, e_y1, color = color1, errcolor = color1, psym = 1
-    oploterror, x2, y2, e_x2, e_y2, color = color2, errcolor = color2, psym = 1
-    ;---------------------------------------------------------------------------
-    ; Plot single fit for whole sample from mpfitexy (solid white line)
-    oplot, xrange, fitall[0] * xrange + fitall[1]
-    ;---------------------------------------------------------------------------
-    ; Plot two lines from mpfitexy2 (colored lines)
-    oplot, xrange, fit[0] * (xrange - x0) + fit[1], color = color1, thick = 2
-    oplot, xrange, fit[0] * (xrange - x0) + fit[1] + fit[2], color = color2, thick = 2
-    ;---------------------------------------------------------------------------
-    ; Plot two lines from running mpfitexy on each sample seperately 
-    ; (dashed lines)
-    oplot, xrange, fit1[0] * xrange + fit1[1], linestyle = 2
-    oplot, xrange, fit2[0] * xrange + fit2[1], linestyle = 2
-    if keyword_set(ps) then closepsdev
-end
-
-;-------------------------------------------------------------------------------
-pro testmpfitexy2inv, ps = ps
-    ;---------------------------------------------------------------------------
-    ; PURPOSE
-    ; Code to test inverse fitting of mpfitexy2 and mpfitexy
-    ;---------------------------------------------------------------------------
-    
-    ;---------------------------------------------------------------------------
-    ; SETUP
-    ;---------------------------------------------------------------------------
-    ; Set up two samples of data. Populate sample 1 with smaller values
-    x = [2.43184, 2.34696, 2.21818, 2.23748, 2.16919, 2.12780, 2.15438, $
-        2.24805, 2.29982, 2.14897, 2.17739, 2.22395, 2.12592, 2.44776, $
-        2.19388, 2.37343, 2.39492, 2.23249, 2.17179, 2.40253, 2.38844, $
-        2.37377, 2.22880, 2.21212, 2.26511, 2.32707, 2.33750, 2.15525]
-    y = [-25.3406, -24.8878, -22.6971, -22.8706, -22.7128, -22.4252, -22.9278, $
-        -23.8840, -24.7333, -23.0504, -23.5204, -24.0678, -23.0894, -25.5364, $
-        -23.5926, -25.3422, -25.0512, -24.2071, -24.1777, -25.1833, -24.8495, $
-        -24.5180, -24.4620, -23.2211, -25.2567, -24.8611, -25.2406, -23.2333]
-    e_x = [0.00571056, 0.0249614, 0.00348239, 0.0192876, 0.0228633, $
-        0.00863316, 0.0357660, 0.00380802, 0.00545385, 0.00564655, $
-        0.00300506, 0.0340787, 0.0335453, 0.00403909, 0.0522591, $
-        0.0109578, 0.00863588, 0.0209927, 0.0510806, 0.0656906, 0.0100137, $
-        0.00491871, 0.0204541, 0.00346392, 0.0107160, 0.00327621, $
-        0.00947749, 0.0233549]
-    e_y = [0.0434049, 0.0429708, 0.208040, 0.159271, 0.0503973, 0.103848, $
-        0.0504721, 0.0643180, 0.0422348, 0.0273715, 0.0239415, 0.0999366, $
-        0.0457358, 0.0461065, 0.0563985, 0.0450141, 0.0479903, 0.0541895, $
-        0.0601011, 0.0521960, 0.0512739, 0.0498970, 0.0448522, 0.0457561, $
-        0.0708393, 0.0523630, 0.0460620, 0.0519679]
-
-    sample1 = where(y ge -8.3 * x - 5.4)
-    sample2 = where(y lt -8.3 * x - 5.4)
-
-    x1 = x[sample1]
-    y1 = y[sample1]
-    x2 = x[sample2]
-    y2 = y[sample2]
-
-    x0 = 2.5
-
-    e_x1 = e_x[sample1]
-    e_y1 = e_y[sample1]
-    e_x2 = e_x[sample2]
-    e_y2 = e_y[sample2]
-
-    ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once using MPFITEXY
-    print, "# MPFITEXY"
-    fitall = mpfitexy(x, y, e_x, e_y, e_int = e_int1, errors = errorsall, $
-        /quiet, dof = dofall, minchi2 = minchi2all, guess = [-8.d, -26.d], $
-        x0 = x0, /reduce)
-    print, "Fit = ", fitall
-    print, "Errors = ", errorsall
-    print, "Reduced chi2 = ", sqrt(minchi2all/dofall), ", e_int = ", e_int1
-    print, ""
-    ;---------------------------------------------------------------------------
-    ; Fit the whole sample at once, using MPFITEXY with inverse function
-    print, "# MPFITEXY (inverse function)"
-    fitallinv = mpfitexy(x, y, e_x, e_y, e_int = e_int2, errors = errorsallinv, $
-        /quiet, dof = dofallinv, minchi2 = minchi2allinv, $
-        guess = [-8.d, -26.d], /inv, x0 = x0, /reduce)
-    print, "Fit = ", fitallinv
-    print, "Errors = ", errorsallinv
-    print, "Reduced chi2 = ", sqrt(minchi2allinv/dofallinv), ", e_int = ", e_int2
-    print, ""
-    ;---------------------------------------------------------------------------
-    ; Fit the two samples individually using MPFITEXY2
-    print, "MPFITEXY2"
-    fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
-        dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
-        /quiet, /latex)
-    print, "Fit = ", fit
-    print, "Errors = ", errors
-    print, "Reduced chi2 = ", sqrt(minchi2/dof), $
-        ", e_int = ", e_int_reduced
-    print, ""
-    ;---------------------------------------------------------------------------
-    ; Fit the two samples individually using MPFITEXY2 with inverse function
-    print, "MPFITEXY2 (inverse)"
-    fitinv = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errorsinv, $
-        dof = dofinv, minchi2 = minchi2inv, x0 = x0, /reduce, $
-        e_int = e_int_reducedinv, /inv, /quiet)
-    print, "Fit = ", fitinv
-    print, "Errors = ", errorsinv
-    print, "Reduced chi2 = ", sqrt(minchi2inv/dofinv), $
-        ", e_int = ", e_int_reducedinv
-    ;---------------------------------------------------------------------------
-
-    ;---------------------------------------------------------------------------
-    ; PLOTTING
-    ;---------------------------------------------------------------------------
-    if keyword_set(ps) then begin
-        openpsdev, file = '~/Desktop/mpfitexy2.ps'
-        !x.margin = [5, 1]
-        !y.margin = [3, 1]
-    endif
-
-    color1 = fsc_color("Red")
-    color2 = fsc_color("Blue")
-    xrange = [2, 2.6]
-    yrange = [-22, -26]
-
-    ;---------------------------------------------------------------------------
-    ; Plot data
-    plot, xrange, yrange, yrange = yrange, /nodata, /xstyle, /ystyle
-    oploterror, x1, y1, e_x1, e_y1, color = color1, errcolor = color1, psym = 1
-    oploterror, x2, y2, e_x2, e_y2, color = color2, errcolor = color2, psym = 1
-    ;---------------------------------------------------------------------------
-    ; Plot single fit for whole sample from mpfitexy (solid white line)
-    oplot, xrange, fitall[0] * (xrange - x0) + fitall[1]
-    oplot, xrange, fitallinv[0] * (xrange -x0) + fitallinv[1], linestyle = 1
-    ;---------------------------------------------------------------------------
-    ; Plot two lines from mpfitexy2 (colored lines)
-    oplot, xrange, fit[0] * (xrange - x0) + fit[1], color = color1
-    oplot, xrange, fit[0] * (xrange - x0) + fit[1] + fit[2], color = color2
-    oplot, xrange, fitinv[0] * (xrange - x0) + fitinv[1], color = color1, linestyle = 1
-    oplot, xrange, fitinv[0] * (xrange - x0) + fitinv[1] + fitinv[2], color = color2, linestyle = 1
-    if keyword_set(ps) then closepsdev
 end
