@@ -58,7 +58,7 @@ pro testmpfitexy2, ps = ps
     print, "Reduced chi2 = ", sqrt(minchi2exy/(n_elements(x1) + n_elements(x2) - 2))
     ;---------------------------------------------------------------------------
     ; Fit the whole sample at once, totally free, using MPFITEXY
-    fitall = mpfitexy(x, y, e_x, e_y, e_int = 0., errors = errorsall, $
+    fitall = mpfitexy(x, y, e_x, e_y, e_int_guess = 0., errors = errorsall, $
         /quiet, dof = dofall, minchi2 = minchi2all)
     print, "# FIT ALL (MPFITEXY, no intrinsic error)"
     print, "Fit = ", fitall
@@ -67,7 +67,7 @@ pro testmpfitexy2, ps = ps
     ;---------------------------------------------------------------------------
     ; Fit the two samples individually using mpfitexy2
     fit = mpfitexy2(x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, errors = errors, $
-        dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int = e_int_reduced, $
+        dof = dof, minchi2 = minchi2, x0 = x0, /reduce, e_int_reduce = e_int_reduced, $
         /quiet)
     print, "MPFITEXY2"
     print, "Fit = ", fit
@@ -78,9 +78,9 @@ pro testmpfitexy2, ps = ps
     ; Fit the two samples seperately, constrain the slope to be that found with
     ; mpfitexy2
     fit1 = mpfitexy(x1, y1, e_x1, e_y1, guess = [fit[0], 0.], /fixslope, $
-        errors = errors1, dof = dof1, minchi2 = minchi21, e_int = e_int, /quiet)
+        errors = errors1, dof = dof1, minchi2 = minchi21, e_int_guess = e_int_guess, /quiet)
     fit2 = mpfitexy(x2, y2, e_x2, e_y2, guess = [fit[0], 0.], /fixslope, $
-        errors = errors2, dof = dof2, minchi2 = minchi22, e_int = e_int, /quiet)
+        errors = errors2, dof = dof2, minchi2 = minchi22, e_int_guess = e_int_guess, /quiet)
     print, "MPFITEXY of two samples with fixed slope " + strtrim(fit[0], 2)
     print, "Fits = ", fit1, fit2
     print, "Errors = ", errors1, errors2
@@ -91,10 +91,9 @@ pro testmpfitexy2, ps = ps
     ; PLOTTING
     ;---------------------------------------------------------------------------
     if keyword_set(ps) then begin
-        openpsdev, file = '~/Desktop/mpfitexy2.ps', /mnras, xsize = 13, $
-            ysize = 10
-        !x.margin = [5, 1]
-        !y.margin = [3, 1]
+        openpsdev, file = '~/Desktop/mpfitexy2.ps', /slide
+        !x.margin = [8, 1]
+        !y.margin = [4, 1]
     endif
 
     color1 = fsc_color("Red")
@@ -104,7 +103,8 @@ pro testmpfitexy2, ps = ps
 
     ;---------------------------------------------------------------------------
     ; Plot data
-    plot, xrange, yrange, yrange = yrange, /nodata, /xstyle, /ystyle
+    plot, xrange, yrange, yrange = yrange, /nodata, /xstyle, /ystyle, $
+        xtitle = textoidl('log (v / km s^{-1})'), ytitle = textoidl('M_K')
     oploterror, x1, y1, e_x1, e_y1, color = color1, errcolor = color1, psym = 1
     oploterror, x2, y2, e_x2, e_y2, color = color2, errcolor = color2, psym = 1
     ;---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ pro testmpfitexy2, ps = ps
     oplot, xrange, fit[0] * (xrange - x0) + fit[1], color = color1, thick = 2
     oplot, xrange, fit[0] * (xrange - x0) + fit[1] + fit[2], color = color2, thick = 2
     ;---------------------------------------------------------------------------
-    ; Plot two lines from running mpfitexy on each sample seperately 
+    ; Plot two lines from running mpfitexy on each sample separately 
     ; (dashed lines)
     oplot, xrange, fit1[0] * xrange + fit1[1], linestyle = 2
     oplot, xrange, fit2[0] * xrange + fit2[1], linestyle = 2
