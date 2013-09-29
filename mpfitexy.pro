@@ -3,7 +3,7 @@
 ;   MPFITEXY
 ;
 ; AUTHOR:
-;   Michael Williams <mike@pentangle.net>, University of Oxford/ESO
+;   Michael Williams <williams@mpe.mpg.de>, MPE, Garching b. Muenchen
 ;
 ; PURPOSE
 ;   Uses MPFIT to determine straight line fit to data with errors in both
@@ -12,26 +12,24 @@
 ;   whistles.
 ;
 ;   MPFITEXY is merely a wrapper to MPFIT. In the absence of intrinsic scatter
-;   it minimizes the same figure of merit at the ASTROIDL FITEXY routine.
-;   It adds support for intrinsic scatter (see Tremaine et al. 2002) and 
-;   provides a number of other convenient features. These features are 
-;   discussed, and relevant literature cited, in Section 4 of Williams M.J., 
-;   Bureau M., Cappellari M., 2010, MNRAS (submitted). You need not cite that 
-;   publication if you find MPFITEXY useful. However, if you wish, you may 
-;   refer to the URL 
-;     <http://purl.org/mike/mpfitexy/>
-;   where the code can be found. 
+;   it minimizes the same figure of merit at the ASTROIDL FITEXY routine. It
+;   adds support for intrinsic scatter (see Tremaine et al. 2002) and provides a
+;   number of other convenient features. See http://purl.org/mike/mpfitexy for
+;   an overview, links to background reading, and important usage warnings.
 ;   
-;   The /reduce keyword, which adjusts the intrinsic scatter to ensure
-;   the reduced chi^2 is ~= 1.0 uses the iterative procedure described
-;   in Section 3.2.1 of Bedregal et al. 2006.
+;   The features of the code are discussed, and relevant literature cited, in
+;   Section 4 of Williams, Bureau & Cappellari, 2010, MNRAS, 409, 1330. In the
+;   interests of reproducibility, you should either cite that publication (which
+;   I would prefer) or refer to the permanent URL at which MPFITEXY can always
+;   be found: http://purl.org/mike/mpfitexy. MPFITEXY is dependent on the MPFIT
+;   package, which you must separately acknowledge by citing Markwardt C. B.,
+;   2009, in Astronomical Data Analysis Software and Systems XVIII, Bohlender,
+;   D., Dowler P., Durand D., eds., Astronomical Society of the Pacific
+;   Conference Series. [http://adsabs.harvard.edu/abs/2009ASPC..411..251M]
 ;
-;   MPFITEXY is dependent on the MPFIT package, which you should 
-;   acknowledge by citing:
-;     Markwardt C. B., 2008, in Astronomical Data Analysis Software and
-;     Systems XVIII, Bohlender, D., Dowler P., Durand D., eds.,
-;     Astronomical Society of the Pacific Conference Series.
-;     [http://adsabs.harvard.edu/abs/2009ASPC..411..251M]
+;   The /reduce keyword, which adjusts the intrinsic scatter to ensure the
+;   reduced chi^2 is ~= 1.0 uses the simple iterative procedure described in
+;   Section 3.2.1 of Bedregal et al. 2006, MNRAS, 373, 1125.
 ; 
 ; CALLING SEQUENCE:
 ;  result = mpfitexy(x, y, e_x, e_y, x0 = x0, guess = guess, 
@@ -90,8 +88,10 @@
 ;  2009.08.05 - Correctly propagate covariance term into intercept error after 
 ;               inverse fit (thanks to Tim Davis, University of Oxford)
 ;  2010.05.15 - Initial public release (v1.0, hg revision 24)
+;  2011.06.20 - Update contact details, references, acknowledgment instructions
+;               (v1.01, hg revision 28)
 ;- 
-; Copyright (C) 2009-2010, Michael Williams <mike@pentangle.net>
+; Copyright (C) 2009-2011, Michael Williams <williams@mpe.mpg.de>
 ; This software is provided as is without any warranty whatsoever. Permission 
 ; to use, copy, modify, and distribute modified or unmodified copies is 
 ; granted, provided this copyright notice and disclaimer are included unchanged.
