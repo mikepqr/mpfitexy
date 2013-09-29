@@ -3,7 +3,7 @@
 ;   MPFITEXY
 ;
 ; AUTHOR:
-;   Michael Williams <williams@mpe.mpg.de>, MPE, Garching b. Muenchen
+;   Michael Williams <williams@astro.columbia.edu>, Columbia University
 ;
 ; PURPOSE
 ;   Uses MPFIT to determine straight line fit to data with errors in both
@@ -89,9 +89,11 @@
 ;               inverse fit (thanks to Tim Davis, University of Oxford)
 ;  2010.05.15 - Initial public release (v1.0, hg revision 24)
 ;  2011.06.20 - Update contact details, references, acknowledgment instructions
-;               (v1.01, hg revision 28)
+;               (Release tagged v1.0.1)
+;  2013.09.29 - Update contact details
+;               (Release tagged v1.0.2)
 ;- 
-; Copyright (C) 2009-2011, Michael Williams <williams@mpe.mpg.de>
+; Copyright (C) 2009-2013, Michael Williams <williams@astro.columbia.edu>
 ; This software is provided as is without any warranty whatsoever. Permission 
 ; to use, copy, modify, and distribute modified or unmodified copies is 
 ; granted, provided this copyright notice and disclaimer are included unchanged.
