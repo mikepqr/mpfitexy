@@ -201,7 +201,7 @@ function mpfitexy, x, y, e_x, e_y, x0 = x0, guess = guess, $
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
     ;---------------------------------------------------------------------------
     if keyword_set(reduce1) then begin
-        e_int = mean(e_y_)/10.
+        e_int = mean(e_y_[ok])/10.
         while abs(chired - 1.) gt 0.01 do begin
             e_int = e_int * chired^(4./3)
             result = mpfit('lineresid', guess_, functargs = {x:x_[ok], y:y_[ok], $
