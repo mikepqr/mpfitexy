@@ -92,6 +92,9 @@
 ;               (Release tagged v1.0.1)
 ;  2013.09.29 - Update contact details
 ;               (Release tagged v1.0.2)
+;  2016.06.28 - Fix minor bug with NaNs in errors
+;               https://github.com/williamsmj/mpfitexy/issues/1
+;               (Release tagged v1.0.3)
 ;- 
 ; Copyright (C) 2009-2013, Michael Williams <williams@astro.columbia.edu>
 ; This software is provided as is without any warranty whatsoever. Permission 
