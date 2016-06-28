@@ -234,7 +234,7 @@ function mpfitexy2, x1, y1, x2, y2, e_x1, e_y1, e_x2, e_y2, x0 = x0, $
     ; CALL MPFIT UNTIL REDUCED CHI2 ~= 1.0 IF REQUIRED
     ;---------------------------------------------------------------------------
     if keyword_set(reduce1) then begin
-        e_int = mean([e_y1_, e_y2_])/10.
+        e_int = mean([e_y1_[ok1], e_y2_[ok2]])/10.
         while abs(chired - 1.) gt 0.01 do begin
             e_int = e_int * chired^(4./3)
             result = mpfit('parallellineresid', guess_, functargs = {x1:x1_[ok1], $
