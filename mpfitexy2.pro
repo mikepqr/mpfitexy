@@ -3,7 +3,7 @@
 ;   MPFITEXY2
 ;
 ; AUTHOR:
-;   Michael Williams <williams@astro.columbia.edu>, Columbia University
+;   Michael Lee Williams <mike@mike.place>
 ;
 ; PURPOSE
 ;   Uses MPFIT to determine a common slope and two intercepts for two sets of
@@ -101,8 +101,10 @@
 ;  2016.06.28 - Fix minor bug with NaNs in errors
 ;               https://github.com/williamsmj/mpfitexy/issues/1
 ;               (Release tagged v1.0.3)
+;  2021.01.26 - Update name and email
+;               (Release tagged v1.0.4)
 ;- 
-; Copyright (C) 2009-2013, Michael Williams <williams@astro.columbia.edu>
+; Copyright (C) 2009-2021, Michael Lee Williams <mike@mike.place>
 ; This software is provided as is without any warranty whatsoever. Permission 
 ; to use, copy, modify, and distribute modified or unmodified copies is 
 ; granted, provided this copyright notice and disclaimer are included unchanged.
